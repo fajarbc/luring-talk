@@ -1,0 +1,8 @@
+{
+  "name": "LuringTalk Call",
+  "description": "A P2P voice/video call app for local Wi-Fi networks using QR code signaling.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

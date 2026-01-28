@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>LuringTalk Call</title>
+    <meta name="description" content="Offline P2P Video Calling" />
+    
+    <!-- PWA meta tags -->
+    <meta name="theme-color" content="#00d4ff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LuringTalk" />
+
+    <!-- Icons -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+
+    <!-- Fonts and Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+
+    <!-- Tailwind CSS (Cached by SW for offline) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              background: "#050505",
+              surface: "#121212",
+              primary: "#00f0ff", /* Neon Cyan */
+              secondary: "#ff0099", /* Neon Pink */
+              accent: "#39ff14", /* Neon Green */
+              "glass": "rgba(255, 255, 255, 0.05)",
+            },
+            fontFamily: {
+              sans: ["Inter", "sans-serif"],
+              mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"],
+            },
+            boxShadow: {
+              "neon-cyan": "0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3)",
+              "neon-pink": "0 0 10px rgba(255, 0, 153, 0.5), 0 0 20px rgba(255, 0, 153, 0.3)",
+              "neon-green": "0 0 10px rgba(57, 255, 20, 0.5), 0 0 20px rgba(57, 255, 20, 0.3)",
+            },
+            animation: {
+              "glow": "glow 2s ease-in-out infinite alternate",
+            },
+            keyframes: {
+              glow: {
+                "0%": { textShadow: "0 0 5px rgba(255,255,255,0.5)" },
+                "100%": { textShadow: "0 0 20px rgba(255,255,255,0.8), 0 0 10px rgba(0,240,255,0.5)" },
+              }
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      body { background-color: #050505; color: #ffffff; }
+      ::-webkit-scrollbar { width: 0px; background: transparent; }
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "jsqr": "https://esm.sh/jsqr@^1.4.0",
+    "qrcode": "https://esm.sh/qrcode@^1.5.4",
+    "url": "https://esm.sh/url@^0.11.4",
+    "express": "https://esm.sh/express@^5.2.1",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "path": "https://esm.sh/path@^0.12.7",
+    "http": "https://esm.sh/http@^0.0.1-security",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "fs": "https://esm.sh/fs@^0.0.1-security",
+    "https": "https://esm.sh/https@^1.0.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
