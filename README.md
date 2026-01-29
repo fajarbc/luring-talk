@@ -74,29 +74,6 @@ npm start
 
 ---
 
-## ✅ Test Checklist
-
-Use this checklist to verify functionality:
-
-1.  [ ] **Install PWA**: Add to home screen on both Android and iOS.
-2.  [ ] **Offline Load**: Turn off mobile data/internet and launch app.
-3.  [ ] **HTTPS Redirect**: Accessing `http://IP:8081` redirects to `https://IP:8080`.
-4.  [ ] **Permission Request**: App asks for Camera/Mic on first load.
-5.  [ ] **Signal Flow**:
-    *   [ ] Device A generates Offer QR.
-    *   [ ] Device B scans Offer -> Generates Answer QR.
-    *   [ ] Device A scans Answer -> Call connects.
-6.  [ ] **Video/Audio**: Both peers can see/hear each other.
-7.  [ ] **Controls**:
-    *   [ ] Mute Audio works.
-    *   [ ] Disable Video works.
-    *   [ ] Switch Camera (Front/Back) works.
-8.  [ ] **Timer**: Call timer counts up correctly.
-9.  [ ] **End Call**: Tapping End returns to Home screen and stops camera.
-10. **Reconnection**: Can start a new call immediately after ending one.
-
----
-
 ## 📊 Performance Notes
 
 *   **Connection Time**: Typically < 2 seconds after final scan.
