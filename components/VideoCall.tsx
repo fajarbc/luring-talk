@@ -67,13 +67,31 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
 
   useEffect(() => {
     if (localVideoRef.current) {
+      console.log("Setting local stream to video element. Tracks:", localStream.getTracks().length);
+      localStream.getTracks().forEach((track, i) => {
+        console.log(`  Track ${i}: ${track.kind} (enabled=${track.enabled})`);
+      });
       localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.play().catch(err => {
+        console.error("Local video play error:", err);
+      });
     }
   }, [localStream]);
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
+      console.log("Setting remote stream to video element. Tracks:", remoteStream.getTracks().length);
+      remoteStream.getTracks().forEach((track, i) => {
+        console.log(`  Track ${i}: ${track.kind} (enabled=${track.enabled}, readyState=${track.readyState})`);
+      });
       remoteVideoRef.current.srcObject = remoteStream;
+      // Force play
+      remoteVideoRef.current.play().catch(err => {
+        console.error("Remote video play error:", err);
+      });
+      console.log("Remote video srcObject set. Can play:", remoteVideoRef.current.canPlayType('video/mp4'));
+    } else if (!remoteStream) {
+      console.log("remoteStream is null/undefined");
     }
   }, [remoteStream]);
 
@@ -91,6 +109,14 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
     setIsVideoMuted(!isVideoMuted);
   };
 
+  const handleRemoteVideoError = (e: any) => {
+    console.error("Remote video error:", e);
+  };
+
+  const handleLocalVideoError = (e: any) => {
+    console.error("Local video error:", e);
+  };
+
   return (
     <div 
       className="fixed inset-0 bg-background z-50 flex flex-col overflow-hidden"
@@ -102,6 +128,7 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
           ref={remoteVideoRef}
           autoPlay 
           playsInline 
+          onError={handleRemoteVideoError}
           className={`w-full h-full object-cover transition-opacity duration-700 ease-in-out ${remoteStream ? 'opacity-100' : 'opacity-0'}`}
         />
         {!remoteStream && (
@@ -123,6 +150,7 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
             autoPlay 
             playsInline 
             muted 
+            onError={handleLocalVideoError}
             className="w-full h-full object-cover transform -scale-x-100" 
           />
           {isVideoMuted && (

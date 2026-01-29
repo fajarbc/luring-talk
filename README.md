@@ -117,3 +117,11 @@ npm install
 npm run build
 npm start
 ```
+
+---
+
+## 📄 License
+
+This project is open source for **personal, non-commercial use only**.
+Commercial use requires a paid license from the copyright holder.
+See [LICENSE](LICENSE) for full terms.

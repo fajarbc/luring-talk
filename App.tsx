@@ -6,6 +6,13 @@ import QRScanner from './components/QRScanner';
 import VideoCall from './components/VideoCall';
 
 const ICE_GATHERING_TIMEOUT = 10000; // 10 seconds timeout for candidate gathering
+const DEBUG_MODE = import.meta.env.VITE_DEBUG_MODE === 'true';
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+console.log('DEBUG_MODE:', DEBUG_MODE, 'VITE_DEBUG_MODE:', import.meta.env.VITE_DEBUG_MODE);
 
 function App() {
   const [appState, setAppState] = useState<AppState>(AppState.HOME);
@@ -19,6 +26,9 @@ function App() {
   // Error & Warning States
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>('');
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState<boolean>(false);
   
   // WebRTC Refs
   const pc = useRef<RTCPeerConnection | null>(null);
@@ -28,6 +38,34 @@ function App() {
 
   useEffect(() => {
     getLocalIP().then(setLocalIP);
+  }, []);
+
+  useEffect(() => {
+    const checkInstalled = () => {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      const isIOSStandalone = (window.navigator as any).standalone === true;
+      setIsInstalled(isStandalone || isIOSStandalone);
+    };
+
+    const onBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    const onAppInstalled = () => {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+      setWarning('App installed successfully.');
+    };
+
+    checkInstalled();
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', onAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', onAppInstalled);
+    };
   }, []);
 
   // Effect to attach local stream to background video for preview (Smooth transition handled via CSS)
@@ -45,49 +83,141 @@ function App() {
     }
   }, [warning]);
 
+  // Clear debug info when leaving scanner state
+  useEffect(() => {
+    if (appState !== AppState.SCANNING_OFFER && appState !== AppState.SCANNING_ANSWER) {
+        setDebugInfo('');
+    } else {
+        setDebugInfo(`🔍 Scanning for ${appState === AppState.SCANNING_OFFER ? 'OFFER' : 'ANSWER'}...`);
+    }
+  }, [appState]);
+
+  // Fallback: Force transition to CONNECTED after 15 seconds in SHOWING_ANSWER
+  // This handles cases where tracks don't arrive but connection is ready
+  useEffect(() => {
+    if (appState === AppState.SHOWING_ANSWER && pc.current) {
+      const timeout = setTimeout(() => {
+        if (appState === AppState.SHOWING_ANSWER && pc.current?.signalingState === 'stable') {
+          console.log("⏱️ Timeout: Forcing transition to CONNECTED after 15s in SHOWING_ANSWER");
+          setDebugInfo(prev => prev + `\n⏱️ Timeout - forcing connection`);
+          setAppState(AppState.CONNECTED);
+        }
+      }, 15000);
+      return () => clearTimeout(timeout);
+    }
+  }, [appState]);
+
   /**
    * Initializes the RTCPeerConnection and Local Media Stream.
    * This is called before generating an offer or an answer.
    */
   const initializePeerConnection = useCallback(async () => {
     const config: RTCConfiguration = {
-      // No ICE servers needed for local LAN (Link-Local / Private IP)
-      iceServers: [], 
-      iceCandidatePoolSize: 10
+      // Try local first, but add STUN servers as fallback for mDNS/local discovery
+      iceServers: [],
+      iceTransportPolicy: 'all', 
+      iceCandidatePoolSize: 0
+      // iceServers: [
+      //   { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }
+      // ], 
+      // iceCandidatePoolSize: 10
     };
     
     const peer = new RTCPeerConnection(config);
     
+    // Handle ICE Candidates
+    let candidateCount = 0;
+    peer.onicecandidate = (event) => {
+      if (event.candidate) {
+        candidateCount++;
+        console.log(`ICE Candidate ${candidateCount}:`, event.candidate.candidate.substring(0, 50));
+        setDebugInfo(prev => prev + `\n📄 ICE Candidate #${candidateCount}`);
+      } else {
+        console.log("ICE Gathering Complete. Total candidates:", candidateCount);
+        setDebugInfo(prev => prev + `\n🌟 ICE Gathering done (${candidateCount} candidates)`);
+      }
+    };
+
     // Monitoring Connection State
     peer.onconnectionstatechange = () => {
-        console.log("Connection State:", peer.connectionState);
-        switch(peer.connectionState) {
+        const state = peer.connectionState;
+        console.log("Connection State:", state);
+        setDebugInfo(prev => prev + `\n🔗 ConnState: ${state}`);
+        switch(state) {
             case 'disconnected':
             case 'failed':
             case 'closed':
-                if (appState !== AppState.HOME) {
-                    setError("Connection lost. Peer disconnected.");
-                }
+                setError("Connection lost. Peer disconnected.");
                 break;
         }
     };
 
     // Monitoring ICE State
     peer.oniceconnectionstatechange = () => {
-      console.log("ICE State:", peer.iceConnectionState);
-      if (peer.iceConnectionState === 'connected') {
-        setAppState(AppState.CONNECTED);
+      const iceState = peer.iceConnectionState;
+      console.log("ICE State:", iceState);
+      setDebugInfo(prev => prev + `\n❄️ ICEState: ${iceState}`);
+      
+      switch(iceState) {
+        case 'new':
+          setDebugInfo(prev => prev + `\n🔋 ICE gathering starting...`);
+          break;
+        case 'checking':
+          setDebugInfo(prev => prev + `\n🔍 ICE checking candidates...`);
+          break;
+        case 'connected':
+        case 'completed':
+          console.log("ICE Connected/Completed - Setting app to CONNECTED");
+          setDebugInfo(prev => prev + `\n✅ ICE CONNECTED - Starting video call`);
+          setAppState(AppState.CONNECTED);
+          break;
+        case 'disconnected':
+          setDebugInfo(prev => prev + `\n⚠️ ICE disconnected`);
+          break;
+        case 'failed':
+          console.error("ICE Connection Failed");
+          setDebugInfo(prev => prev + `\n❌ ICE FAILED`);
+          setError("Connection Failed - Network instability detected.");
+          break;
       }
-      if (peer.iceConnectionState === 'disconnected' || peer.iceConnectionState === 'failed') {
-        console.error("ICE Connection Failed");
-        setError("Connection Failed - Network instability detected.");
-      }
+    };
+
+    // Monitor signaling state
+    peer.onsignalingstatechange = () => {
+      const sigState = peer.signalingState;
+      console.log("Signaling State:", sigState);
+      setDebugInfo(prev => prev + `\n📬 SigState: ${sigState}`);
     };
 
     // Handle Remote Stream
     peer.ontrack = (event) => {
-      console.log("Received remote track");
-      setRemoteStream(event.streams[0]);
+      console.log("Received remote track:", event.track.kind);
+      console.log("Signaling state when track arrived:", peer.signalingState, "Connection:", peer.connectionState);
+      setDebugInfo(prev => prev + `\n📹 Remote ${event.track.kind} received`);
+      const stream = event.streams[0];
+      if (stream) {
+        setRemoteStream(stream);
+        console.log("Remote stream set, stream has", stream.getTracks().length, "tracks");
+        
+        // Check if we have both audio and video tracks
+        const hasAudio = stream.getAudioTracks().length > 0;
+        const hasVideo = stream.getVideoTracks().length > 0;
+        console.log("Stream tracks - Audio:", hasAudio, "Video:", hasVideo);
+        setDebugInfo(prev => prev + `\n✅ Tracks ready (A:${hasAudio} V:${hasVideo})`);
+        
+        // Accept signalingState: 'have-remote-offer' (before answer) or 'stable' (after answer)
+        const sigState = peer.signalingState;
+        if (sigState === 'have-remote-offer' || sigState === 'stable') {
+          console.log("✅ READY TO CONNECT - Tracks received with signalingState:", sigState);
+          setDebugInfo(prev => prev + `\n🚀 Transitioning to video call...`);
+          setTimeout(() => {
+            console.log("Setting app state to CONNECTED from ontrack");
+            setAppState(AppState.CONNECTED);
+          }, 100);
+        } else {
+          console.log("⚠️ Signaling state not ready:", sigState);
+        }
+      }
     };
 
     // Get User Media
@@ -137,7 +267,7 @@ function App() {
 
     pc.current = peer;
     return peer;
-  }, [appState]);
+  }, []);
 
   const switchCamera = async () => {
     if (!localStream.current) return;
@@ -205,12 +335,12 @@ function App() {
 
         const payload: SignalingData = {
         type: 'offer',
-        sdp: JSON.stringify(peer.localDescription)
+        sdp: peer.localDescription?.sdp || ''
         };
         
         const qrData = formatSDPForQR(payload);
         generateQR(qrData);
-        setSignalString(btoa(qrData));
+        setSignalString(qrData);
         
         setAppState(AppState.SHOWING_OFFER);
     } catch (err) {
@@ -226,52 +356,70 @@ function App() {
   };
 
   const handleScanOffer = async (data: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const msg = `[${timestamp}] 📥 OFFER SCANNED\nLength: ${data.length}\nData: ${data.substring(0, 30)}...`;
+    setDebugInfo(msg);
+    console.log(msg, data);
+    
     const signal = parseSDPFromQR(data);
+    console.log("Parsed signal:", signal);
+    
     if (!signal || signal.type !== 'offer') {
+      const errMsg = `❌ Parse failed: ${signal?.type || 'null'}`;
+      setDebugInfo(prev => prev + `\n${errMsg}`);
+      console.error(errMsg);
       setError("Invalid QR Code. Expected an Offer from the Caller.");
       return;
     }
+    setDebugInfo(prev => prev + `\n✅ Parsed OFFER successfully\n→ Processing...`);
+    console.log("Processing valid offer");
     processOffer(signal);
   };
 
   const handleManualInput = (inputStr: string) => {
     const cleanStr = inputStr.trim();
-    if (!cleanStr) return;
+    if (!cleanStr) {
+      console.log("Empty input");
+      return;
+    }
+
+    const timestamp = new Date().toLocaleTimeString();
+    setDebugInfo(`[${timestamp}] 📋 Manual paste\nLength: ${cleanStr.length}`);
+    console.log("Processing manual input:", cleanStr.substring(0, 50) + "...");
 
     // Dismiss keyboard logic
     if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
     }
 
-    let signal: any = null;
-
-    try {
-        const jsonStr = atob(cleanStr);
-        signal = JSON.parse(jsonStr);
-    } catch (e) {
-        try {
-            signal = JSON.parse(cleanStr);
-        } catch (e2) {
-             // Invalid format
-        }
-    }
+    const signal = parseSDPFromQR(cleanStr);
+    console.log("Parsed signal:", signal ? `type=${signal.type}` : "null");
+    setDebugInfo(prev => prev + `\n${signal ? `✅ Parsed as ${signal.type?.toUpperCase()}` : `❌ Parse failed`}\n→ Processing...`);
 
     if (signal && signal.type && signal.sdp) {
         if (appState === AppState.SCANNING_OFFER || appState === AppState.HOME) {
             if (signal.type === 'offer') {
+                console.log("Processing offer");
                 processOffer(signal);
             } else {
                 setError("Incorrect code. Expected an OFFER (from Caller).");
             }
         } else if (appState === AppState.SCANNING_ANSWER) {
             if (signal.type === 'answer') {
+                 console.log("Processing answer");
                  processAnswer(signal);
             } else {
-                setError("Incorrect code. Expected an ANSWER (from Callee).");
+                setError("Incorrect code. Expected an ANSWER (from Caller).");
             }
+        } else {
+            console.log("Invalid app state for manual input:", appState);
+            setError("Not in scanning mode. Start or join a call first.");
         }
-    } else if (cleanStr.length > 20) {
-        setError("Invalid code format. Please ensure you copied the entire string.");
+    } else {
+        console.log("Failed to parse signal");
+        if (cleanStr.length > 20) {
+            setError("Invalid code format. Please ensure you copied the entire string.");
+        }
     }
   };
 
@@ -279,13 +427,27 @@ function App() {
    * Device B Flow: Process Offer & Create Answer
    */
   const processOffer = async (signal: SignalingData) => {
+    setDebugInfo(prev => prev + `\n⏳ Initializing peer...`);
     setAppState(AppState.GENERATING_ANSWER);
     
     const peer = await initializePeerConnection();
     if (!peer) return;
 
     try {
-      const remoteDesc = JSON.parse(signal.sdp);
+      let remoteDesc: RTCSessionDescriptionInit;
+      if (typeof signal.sdp === 'object' && signal.sdp.sdp) {
+        remoteDesc = signal.sdp;
+      } else {
+        // Normalize line endings to CRLF for WebRTC
+        const sdpStr = typeof signal.sdp === 'string' ? signal.sdp : signal.sdp.toString();
+        const normalizedSdp = sdpStr.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\r\n');
+        
+        if (normalizedSdp.trim().startsWith('{')) {
+          remoteDesc = JSON.parse(normalizedSdp);
+        } else {
+          remoteDesc = { type: 'offer', sdp: normalizedSdp };
+        }
+      }
       await peer.setRemoteDescription(remoteDesc);
       
       const answer = await peer.createAnswer();
@@ -294,12 +456,12 @@ function App() {
 
       const payload: SignalingData = {
         type: 'answer',
-        sdp: JSON.stringify(peer.localDescription)
+        sdp: peer.localDescription?.sdp || ''
       };
       
       const qrData = formatSDPForQR(payload);
       generateQR(qrData);
-      setSignalString(btoa(qrData));
+      setSignalString(qrData);
       
       setAppState(AppState.SHOWING_ANSWER);
     } catch (err) {
@@ -310,11 +472,23 @@ function App() {
   };
 
   const handleScanAnswer = async (data: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const msg = `[${timestamp}] 📥 ANSWER SCANNED\nLength: ${data.length}\nData: ${data.substring(0, 30)}...`;
+    setDebugInfo(msg);
+    console.log(msg, data);
+    
     const signal = parseSDPFromQR(data);
+    console.log("Parsed signal:", signal);
+    
     if (!signal || signal.type !== 'answer') {
-      setError("Invalid QR Code. Expected an Answer from the Callee.");
+      const errMsg = `❌ Parse failed: ${signal?.type || 'null'}`;
+      setDebugInfo(prev => prev + `\n${errMsg}`);
+      console.error(errMsg);
+      setError("Invalid QR Code. Expected an Answer from the Caller.");
       return;
     }
+    setDebugInfo(prev => prev + `\n✅ Parsed ANSWER successfully\n→ Processing...`);
+    console.log("Processing valid answer");
     processAnswer(signal);
   };
 
@@ -323,14 +497,46 @@ function App() {
    * This completes the handshake.
    */
   const processAnswer = async (signal: SignalingData) => {
-    if (!pc.current) return;
+    setDebugInfo(prev => prev + `\n⏳ Setting remote answer...`);
+    if (!pc.current) {
+      console.error("No peer connection available");
+      setError("Connection not established. Start a call first.");
+      return;
+    }
+    
+    console.log("Current connection state:", pc.current.connectionState, "ICE state:", pc.current.iceConnectionState, "Signaling state:", pc.current.signalingState);
+    
     try {
-      const remoteDesc = JSON.parse(signal.sdp);
+      // Only set remote description if we're in the right state
+      if (pc.current.signalingState !== 'have-local-offer') {
+        console.warn(`Cannot set answer in ${pc.current.signalingState} state. Waiting...`);
+        // Wait a moment and try again
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      let remoteDesc: RTCSessionDescriptionInit;
+      if (typeof signal.sdp === 'object' && signal.sdp.sdp) {
+        remoteDesc = signal.sdp;
+      } else {
+        // Normalize line endings to CRLF for WebRTC
+        const sdpStr = typeof signal.sdp === 'string' ? signal.sdp : signal.sdp.toString();
+        const normalizedSdp = sdpStr.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\r\n');
+        
+        if (normalizedSdp.trim().startsWith('{')) {
+          remoteDesc = JSON.parse(normalizedSdp);
+        } else {
+          remoteDesc = { type: 'answer', sdp: normalizedSdp };
+        }
+      }
+      
+      console.log("Setting remote description with type:", remoteDesc.type);
       await pc.current.setRemoteDescription(remoteDesc);
+      setDebugInfo(prev => prev + `\n✅ Remote description set\n🔌 Signaling: ${pc.current.signalingState}\n⏳ Waiting for ICE...`);
+      console.log("Remote description set successfully. Signaling state:", pc.current.signalingState);
       // Connection should establish automatically via ICE now
     } catch (err) {
       console.error("Error setting final answer", err);
-      setError("Handshake failed. Protocol mismatch.");
+      setError(`Handshake failed: ${(err as Error).message}`);
     }
   };
 
@@ -362,17 +568,20 @@ function App() {
 
   const generateQR = async (text: string) => {
     try {
+      console.log(`Generating QR code with data size: ${text.length} characters`);
+      
       // Use L error correction for maximum data capacity
       const url = await QRCode.toDataURL(text, { 
-          width: 480, 
+          width: 512, 
           margin: 1, 
           color: { dark: '#000000', light: '#ffffff' },
           errorCorrectionLevel: 'L'
       });
+      console.log("QR code generated successfully");
       setQrCodeData(url);
     } catch (err) {
-      console.error(err);
-      setError("Failed to generate QR code.");
+      console.error("QR Generation error:", err);
+      setError(`Failed to generate QR code. Data too large (${text.length} chars). Try using manual code input.`);
     }
   };
 
@@ -415,6 +624,20 @@ function App() {
         }
     } catch (err) {
         setError("Could not access clipboard. Please paste manually.");
+    }
+  };
+
+  const handleInstallApp = async () => {
+    if (!installPrompt) return;
+    try {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        setWarning('Installing app...');
+      }
+      setInstallPrompt(null);
+    } catch (err) {
+      console.error('Install prompt failed:', err);
     }
   };
 
@@ -508,6 +731,23 @@ function App() {
         {/* STATE: HOME */}
         {appState === AppState.HOME && (
           <div className="flex flex-col h-full justify-center">
+
+            {installPrompt && !isInstalled && (
+              <div className="glass-panel rounded-2xl p-4 mb-6 border border-white/10 shadow-neon-cyan">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-bold text-white">Install LuringTalk</p>
+                    <p className="text-xs text-gray-400">Add to Home Screen for better performance & offline access.</p>
+                  </div>
+                  <button
+                    onClick={handleInstallApp}
+                    className="bg-primary text-black font-bold px-4 py-2 rounded-lg shadow-neon-cyan active:scale-95"
+                  >
+                    Install App
+                  </button>
+                </div>
+              </div>
+            )}
             
             <div className="relative mb-12 flex flex-col items-center justify-center">
               {/* Animated Rings */}
@@ -615,9 +855,15 @@ function App() {
             )}
             
             {appState === AppState.SHOWING_ANSWER && (
-                <div className="mt-auto flex items-center justify-center gap-2 text-primary animate-pulse">
+                <div className="mt-auto flex flex-col items-center justify-center gap-2 text-primary animate-pulse">
                     <span className="w-2 h-2 bg-primary rounded-full"></span>
                     <span className="text-xs font-bold uppercase tracking-wider">Waiting for Host to Connect</span>
+                    <span className="text-[8px] text-primary/60 font-mono">({appState} / {pc.current?.signalingState || 'N/A'})</span>
+                    {pc.current && (
+                        <span className="text-[8px] text-yellow-400 font-mono mt-2">
+                            Conn: {pc.current.connectionState} | ICE: {pc.current.iceConnectionState}
+                        </span>
+                    )}
                 </div>
             )}
           </div>
@@ -628,21 +874,36 @@ function App() {
             <div className="fixed inset-0 z-50 bg-black">
                 <QRScanner 
                     instruction={appState === AppState.SCANNING_OFFER ? "Scan Host's QR Code" : "Scan Guest's QR Code"}
-                    onScan={appState === AppState.SCANNING_OFFER ? handleScanOffer : handleScanAnswer}
+                    onScan={(data) => {
+                        console.log("QRScanner detected code:", data.substring(0, 50));
+                        if (appState === AppState.SCANNING_OFFER) {
+                            handleScanOffer(data);
+                        } else {
+                            handleScanAnswer(data);
+                        }
+                    }}
                     onClose={endCall}
                 />
+                
+                {/* Debug Info Panel - Visible only when DEBUG_MODE is true */}
+                {DEBUG_MODE && (
+                  <div className="absolute top-20 left-4 right-4 z-[65] bg-black/90 border border-primary/50 rounded-lg p-4 font-mono text-xs text-primary whitespace-pre-wrap max-h-40 overflow-y-auto shadow-neon-cyan">
+                    {debugInfo || '🔄 Waiting for QR code scan or manual input...'}
+                    <div className="mt-2 text-[9px] text-cyan-400 font-bold">DEBUG MODE ON</div>
+                  </div>
+                )}
                 
                 {/* Manual Input Fallback Overlay */}
                 <div className="absolute bottom-8 left-6 right-6 z-[60]">
                     <div className="glass-panel p-4 rounded-2xl flex flex-col gap-2 shadow-neon-pink border border-secondary/20 bg-black/80">
                         <label className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Or Paste Code</label>
-                        <div className="flex gap-2">
-                            <div className="flex-1 relative">
+                        <div className="flex flex-col gap-3">
+                            <div className="flex gap-2">
                                 <input 
                                     type="text" 
-                                    placeholder="Paste Base64 code..."
+                                    placeholder="Paste Base64 code here..."
                                     value={manualInputVal}
-                                    className="w-full bg-black/50 border border-white/10 rounded-lg pl-3 pr-10 py-3 text-sm text-white focus:outline-none focus:border-secondary transition-colors"
+                                    className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-3 text-sm text-white focus:outline-none focus:border-secondary transition-colors"
                                     onPaste={(e) => {
                                         const val = e.clipboardData.getData('text');
                                         if(val) {
@@ -655,13 +916,14 @@ function App() {
                                         if(e.target.value.length > 50) handleManualInput(e.target.value);
                                     }}
                                 />
-                                <button 
-                                    onClick={handlePasteFromClipboard}
-                                    className="absolute right-2 top-2 bottom-2 aspect-square flex items-center justify-center text-gray-400 hover:text-white bg-white/5 rounded-md"
-                                >
-                                    <span className="material-symbols-outlined text-sm">content_paste</span>
-                                </button>
                             </div>
+                            <button 
+                                onClick={handlePasteFromClipboard}
+                                className="w-full bg-secondary hover:bg-secondary/90 text-black font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                            >
+                                <span className="material-symbols-outlined">content_paste</span>
+                                Paste Code from Clipboard
+                            </button>
                         </div>
                     </div>
                 </div>
