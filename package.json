@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:gh-pages": "vite build && node fix-paths.cjs",
     "preview": "vite preview",
     "start": "node server.js"
   },
