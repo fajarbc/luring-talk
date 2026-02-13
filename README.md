@@ -95,6 +95,14 @@ npm run build
 npm start
 ```
 
+### Debug Mode (Jump Straight to Call UI)
+Set `VITE_DEBUG_MODE=true` before running the app to skip setup and open the video call page directly.
+
+Example:
+```bash
+VITE_DEBUG_MODE=true npm run dev
+```
+
 ---
 
 ## 📄 License

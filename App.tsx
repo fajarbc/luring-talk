@@ -40,6 +40,32 @@ function App() {
     getLocalIP().then(setLocalIP);
   }, []);
 
+  const startDebugCall = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+          facingMode: 'user'
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+
+      localStream.current = stream;
+      setRemoteStream(stream);
+      setWarning('Debug mode: joined video call.');
+      setAppState(AppState.CONNECTED);
+    } catch (e) {
+      console.error("Debug mode getUserMedia error:", e);
+      setError("Debug mode failed to access camera/mic.");
+    }
+  }, []);
+
   useEffect(() => {
     const checkInstalled = () => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
@@ -352,6 +378,10 @@ function App() {
   const joinCall = () => {
     setRole('peer');
     setError(null);
+    if (DEBUG_MODE) {
+      startDebugCall();
+      return;
+    }
     setAppState(AppState.SCANNING_OFFER);
   };
 

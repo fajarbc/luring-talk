@@ -10,11 +10,15 @@ interface VideoCallProps {
 const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndCall, onSwitchCamera }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const localVideoWrapperRef = useRef<HTMLDivElement>(null);
   
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
   const [uiVisible, setUiVisible] = useState(true);
   const [duration, setDuration] = useState(0);
+  const [localPos, setLocalPos] = useState({ x: 16, y: 16 });
+  const [isDraggingLocal, setIsDraggingLocal] = useState(false);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
 
   // 1. Timer logic
   useEffect(() => {
@@ -95,6 +99,14 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
     }
   }, [remoteStream]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      setLocalPos((pos) => clampLocalPosition(pos.x, pos.y));
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const toggleAudio = () => {
     localStream.getAudioTracks().forEach(track => {
       track.enabled = !track.enabled;
@@ -115,6 +127,43 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
 
   const handleLocalVideoError = (e: any) => {
     console.error("Local video error:", e);
+  };
+
+  const clampLocalPosition = (nextX: number, nextY: number) => {
+    const wrapper = localVideoWrapperRef.current;
+    if (!wrapper) return { x: nextX, y: nextY };
+    const rect = wrapper.getBoundingClientRect();
+    const maxX = Math.max(0, window.innerWidth - rect.width);
+    const maxY = Math.max(0, window.innerHeight - rect.height);
+    return {
+      x: Math.min(Math.max(0, nextX), maxX),
+      y: Math.min(Math.max(0, nextY), maxY),
+    };
+  };
+
+  const handleLocalPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    const wrapper = localVideoWrapperRef.current;
+    if (!wrapper) return;
+    wrapper.setPointerCapture(e.pointerId);
+    setIsDraggingLocal(true);
+    const rect = wrapper.getBoundingClientRect();
+    dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const handleLocalPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingLocal) return;
+    e.stopPropagation();
+    const nextX = e.clientX - dragOffsetRef.current.x;
+    const nextY = e.clientY - dragOffsetRef.current.y;
+    setLocalPos(clampLocalPosition(nextX, nextY));
+  };
+
+  const handleLocalPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingLocal) return;
+    e.stopPropagation();
+    setIsDraggingLocal(false);
+    localVideoWrapperRef.current?.releasePointerCapture(e.pointerId);
   };
 
   return (
@@ -143,7 +192,18 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
       </div>
 
       {/* Local Video (Top Left PIP) */}
-      <div className={`absolute top-4 left-4 z-20 w-[25%] min-w-[100px] max-w-[180px] aspect-[3/4] transition-all duration-300 ${uiVisible ? 'opacity-100 translate-y-0' : 'opacity-50 -translate-y-4'}`}>
+      <div
+        ref={localVideoWrapperRef}
+        onPointerDown={handleLocalPointerDown}
+        onPointerMove={handleLocalPointerMove}
+        onPointerUp={handleLocalPointerUp}
+        onPointerCancel={handleLocalPointerUp}
+        onClick={(e) => e.stopPropagation()}
+        style={{ left: `${localPos.x}px`, top: `${localPos.y}px` }}
+        className={`absolute z-20 w-[25%] min-w-[100px] max-w-[180px] aspect-[3/4] transition-all duration-300 touch-none ${
+          uiVisible ? 'opacity-100 translate-y-0' : 'opacity-50 -translate-y-4'
+        } ${isDraggingLocal ? 'cursor-grabbing' : 'cursor-grab'}`}
+      >
         <div className="w-full h-full rounded-2xl overflow-hidden shadow-neon-cyan border border-primary/30 bg-black relative group">
           <video 
             ref={localVideoRef}
