@@ -83,26 +83,21 @@ npm start
 
 ## 💻 Local Development Setup
 
-Development certificates are no longer committed. Generate your own local `key.pem` and `cert.pem` before starting the HTTPS server.
-
 ### 1. Install dependencies
 ```bash
 npm install
 ```
 
-### 2. Generate a local certificate
+### 2. Generate local HTTPS certificates
 ```bash
 npm run cert
 ```
 
-What the script does:
-- creates a self-signed certificate for `localhost`, `127.0.0.1`, and the machine's current LAN IPv4 addresses
-- writes `key.pem` and `cert.pem` at the repo root
-- keeps those files local because `*.pem` is gitignored
+This writes `key.pem` and `cert.pem` in the repo root for local development only. The script includes `localhost`, `*.local`, `127.0.0.1`, and detected LAN IPv4 addresses in the certificate SAN so other devices on the same hotspot/Wi-Fi can open the HTTPS URL.
 
-If you prefer a locally trusted certificate, `mkcert` is a nicer option. Generate `key.pem` and `cert.pem` with it and place them in the repo root.
+If `npm run cert` says OpenSSL is missing, install OpenSSL first. On Windows, Git Bash often already includes `openssl.exe`.
 
-> `npm run cert` shells out to `openssl`. If `openssl` is not on your PATH (common on Windows), run it from Git Bash/WSL or use `mkcert` instead.
+If you want a smoother trusted-local-cert workflow, `mkcert` is usually the nicer option.
 
 ### 3. Build and start the app
 ```bash

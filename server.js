@@ -29,9 +29,9 @@ try {
   }
 } catch (e) {
   console.error('\n❌ CRITICAL ERROR: SSL certificates (key.pem, cert.pem) are missing.');
-  console.error('   getUserMedia requires HTTPS, so the server cannot start without them.');
-  console.error('   Run `npm run cert` to generate a local development certificate, then try again.');
-  console.error('   If you prefer locally trusted certs, use mkcert and save the files as key.pem/cert.pem.\n');
+  console.error('   Camera access requires HTTPS, so the server cannot start without them.');
+  console.error('   Run `npm run cert` to generate fresh local development certificates.');
+  console.error('   See README.md for mkcert and Windows notes.\n');
   process.exit(1);
 }
 

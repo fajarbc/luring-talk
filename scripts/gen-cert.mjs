@@ -1,99 +1,125 @@
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
-const templatePath = path.join(repoRoot, 'openssl.conf');
-const generatedConfigPath = path.join(repoRoot, '.openssl.generated.conf');
 const keyPath = path.join(repoRoot, 'key.pem');
 const certPath = path.join(repoRoot, 'cert.pem');
 
-const getLanIPv4Addresses = () => {
-  const interfaces = os.networkInterfaces();
-  const addresses = [];
+function detectOpenSsl() {
+  const candidates = process.platform === 'win32'
+    ? ['openssl.exe', 'openssl']
+    : ['openssl'];
 
-  for (const networkInterface of Object.values(interfaces)) {
-    for (const address of networkInterface ?? []) {
-      if (address.family === 'IPv4' && !address.internal) {
-        addresses.push(address.address);
+  for (const candidate of candidates) {
+    const result = spawnSync(candidate, ['version'], { stdio: 'ignore' });
+    if (result.status === 0) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function getLanIpv4Addresses() {
+  const interfaces = os.networkInterfaces();
+  const addresses = new Set(['127.0.0.1']);
+
+  for (const entries of Object.values(interfaces)) {
+    for (const entry of entries ?? []) {
+      if (entry.family === 'IPv4' && !entry.internal) {
+        addresses.add(entry.address);
       }
     }
   }
 
-  return Array.from(new Set(addresses));
-};
+  return Array.from(addresses).sort();
+}
 
-const buildAltNames = (lanIPs) => {
-  const entries = [
+function buildOpenSslConfig(addresses) {
+  const altNames = [
     'DNS.1 = localhost',
     'DNS.2 = *.local',
-    'IP.1 = 127.0.0.1',
-    ...lanIPs.map((ip, index) => `IP.${index + 2} = ${ip}`),
-  ];
+    ...addresses.map((address, index) => `IP.${index + 1} = ${address}`),
+  ].join('\n');
 
-  return entries.join('\n');
-};
+  return `[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+prompt = no
 
-const cleanupGeneratedConfig = () => {
-  if (fs.existsSync(generatedConfigPath)) {
-    fs.rmSync(generatedConfigPath);
-  }
-};
+[req_distinguished_name]
+C = US
+ST = State
+L = City
+O = LuringTalk
+CN = localhost
 
-const lanIPs = getLanIPv4Addresses();
-const opensslTemplate = fs.readFileSync(templatePath, 'utf8');
-const resolvedConfig = opensslTemplate.replace('__ALT_NAMES__', buildAltNames(lanIPs));
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
 
-fs.writeFileSync(generatedConfigPath, resolvedConfig, 'utf8');
+[alt_names]
+${altNames}
+`;
+}
 
-console.log('🔐 Generating self-signed development certificate...');
-console.log(`   SAN hosts: localhost, 127.0.0.1${lanIPs.length ? `, ${lanIPs.join(', ')}` : ''}`);
+const openssl = detectOpenSsl();
+
+if (!openssl) {
+  console.error('\n❌ OpenSSL was not found on this machine.');
+  console.error('   Install OpenSSL (or use Git Bash on Windows if it already provides openssl.exe),');
+  console.error('   then rerun `npm run cert`.');
+  console.error('   If you want a nicer trust flow for local development, see the README note about mkcert.\n');
+  process.exit(1);
+}
+
+const addresses = getLanIpv4Addresses();
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'luring-talk-cert-'));
+const configPath = path.join(tempDir, 'openssl.conf');
+
+fs.writeFileSync(configPath, buildOpenSslConfig(addresses), 'utf8');
 
 const result = spawnSync(
-  'openssl',
+  openssl,
   [
     'req',
-    '-nodes',
-    '-new',
     '-x509',
+    '-nodes',
+    '-newkey',
+    'rsa:2048',
+    '-sha256',
+    '-days',
+    '365',
     '-keyout',
     keyPath,
     '-out',
     certPath,
-    '-days',
-    '365',
     '-config',
-    generatedConfigPath,
+    configPath,
     '-extensions',
     'v3_req',
   ],
-  {
-    cwd: repoRoot,
-    stdio: 'inherit',
-  },
+  { stdio: 'inherit' },
 );
 
-cleanupGeneratedConfig();
-
-if (result.error) {
-  if (result.error.code === 'ENOENT') {
-    console.error('\n❌ OpenSSL is not installed or not available on PATH.');
-    console.error('   Install OpenSSL (or use mkcert), then rerun `npm run cert`.');
-    console.error('   On Windows, Git Bash or WSL is the easiest way to get OpenSSL.\n');
-  } else {
-    console.error(`\n❌ Failed to run OpenSSL: ${result.error.message}\n`);
-  }
-
-  process.exit(1);
-}
+fs.rmSync(tempDir, { recursive: true, force: true });
 
 if (result.status !== 0) {
   process.exit(result.status ?? 1);
 }
 
-console.log(`\n✅ Wrote ${path.basename(keyPath)} and ${path.basename(certPath)}.`);
-console.log('   These files stay local because `*.pem` is gitignored.\n');
+console.log('\n✅ Generated local development TLS files:');
+console.log(`   - ${path.relative(repoRoot, keyPath)}`);
+console.log(`   - ${path.relative(repoRoot, certPath)}`);
+console.log('   SAN entries: localhost, *.local, and these IPv4 addresses:');
+for (const address of addresses) {
+  console.log(`   - ${address}`);
+}
+console.log('\nNext steps: npm run build && npm start\n');
