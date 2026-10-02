@@ -13,7 +13,6 @@ const PORT = 8080;
 const HTTP_PORT = 8081;
 
 // SSL Certificate Configuration
-// You must generate these files using openssl (see README.md)
 const keyPath = path.join(__dirname, 'key.pem');
 const certPath = path.join(__dirname, 'cert.pem');
 
@@ -29,9 +28,10 @@ try {
     throw new Error('Certificates not found');
   }
 } catch (e) {
-  console.error('\n❌ CRITICAL ERROR: SSL Certificates (key.pem, cert.pem) not found.');
-  console.error('   getUserMedia requires HTTPS. The server cannot start without SSL.');
-  console.error('   Please run the openssl command found in README.md\n');
+  console.error('\n❌ CRITICAL ERROR: SSL certificates (key.pem, cert.pem) are missing.');
+  console.error('   Camera access requires HTTPS, so the server cannot start without them.');
+  console.error('   Run `npm run cert` to generate fresh local development certificates.');
+  console.error('   See README.md for mkcert and Windows notes.\n');
   process.exit(1);
 }
 
