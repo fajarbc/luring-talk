@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:gh-pages": "vite build && node fix-paths.cjs",
+    "build:gh-pages": "vite build --mode gh-pages",
     "preview": "vite preview",
     "cert": "node scripts/gen-cert.mjs",
     "start": "node server.js"
