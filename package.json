@@ -8,7 +8,8 @@
     "build": "vite build",
     "build:gh-pages": "vite build && node fix-paths.cjs",
     "preview": "vite preview",
-    "start": "node server.js"
+    "start": "node server.js",
+    "cert": "node scripts/gen-cert.mjs"
   },
   "dependencies": {
     "express": "^4.18.2",
