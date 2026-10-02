@@ -83,14 +83,24 @@ npm start
 
 ## 💻 Local Development Setup
 
-### 1. Generate SSL (Required)
-```bash
-openssl req -nodes -new -x509 -keyout key.pem -out cert.pem -days 365 -subj "/C=US/ST=State/L=City/O=LuringTalk/CN=localhost"
-```
-
-### 2. Run
+### 1. Install dependencies
 ```bash
 npm install
+```
+
+### 2. Generate local HTTPS certificates
+```bash
+npm run cert
+```
+
+This writes `key.pem` and `cert.pem` in the repo root for local development only. The script includes `localhost`, `*.local`, `127.0.0.1`, and detected LAN IPv4 addresses in the certificate SAN so other devices on the same hotspot/Wi-Fi can open the HTTPS URL.
+
+If `npm run cert` says OpenSSL is missing, install OpenSSL first. On Windows, Git Bash often already includes `openssl.exe`.
+
+If you want a smoother trusted-local-cert workflow, `mkcert` is usually the nicer option.
+
+### 3. Build and start the app
+```bash
 npm run build
 npm start
 ```
