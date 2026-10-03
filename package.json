@@ -9,6 +9,9 @@
     "build:gh-pages": "vite build && node fix-paths.cjs",
     "preview": "vite preview",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint App.tsx components src types.ts utils vite.config.ts",
+    "format": "prettier --write .",
     "cert": "node scripts/gen-cert.mjs",
     "start": "node server.js"
   },
@@ -21,6 +24,15 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.6",
+    "@types/react-dom": "^19.0.2",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
     "@vitejs/plugin-react": "^4.2.1",
     "vite": "^5.1.4",
     "vitest": "^2.1.9"
