@@ -42,6 +42,7 @@ function App() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isProcessingManualInput, setIsProcessingManualInput] = useState(false);
 
   const pc = useRef<RTCPeerConnection | null>(null);
   const dataChannel = useRef<RTCDataChannel | null>(null);
@@ -54,6 +55,7 @@ function App() {
   const makingOffer = useRef(false);
   const ignoreOffer = useRef(false);
   const isSettingRemoteAnswerPending = useRef(false);
+  const negotiationInFlight = useRef(false);
 
   useEffect(() => {
     if (localStream.current && bgVideoRef.current) {
@@ -363,6 +365,8 @@ function App() {
     makingOffer.current = false;
     ignoreOffer.current = false;
     isSettingRemoteAnswerPending.current = false;
+    negotiationInFlight.current = false;
+    setIsProcessingManualInput(false);
     setRemoteStream(null);
     setQrCodeData(null);
     setSignalString('');
@@ -406,6 +410,12 @@ function App() {
   };
 
   const processOffer = async (handshake: CompactHandshake) => {
+    if (negotiationInFlight.current) {
+      setWarning('Connection is already being established. Please wait…');
+      return;
+    }
+    negotiationInFlight.current = true;
+    setIsProcessingManualInput(true);
     setError(null);
     setDebugInfo('⏳ Rebuilding data-channel offer…');
     setAppState(AppState.GENERATING_ANSWER);
@@ -426,16 +436,26 @@ function App() {
       console.error('Error establishing answer:', offerError);
       setError(`Connection failed during data-channel setup: ${(offerError as Error).message}`);
       endCall();
+    } finally {
+      negotiationInFlight.current = false;
+      setIsProcessingManualInput(false);
     }
   };
 
   const processAnswer = async (handshake: CompactHandshake) => {
-    setDebugInfo('⏳ Setting remote data-channel answer…');
+    if (negotiationInFlight.current) {
+      setWarning('Connection is already being established. Please wait…');
+      return;
+    }
     const peer = pc.current;
     if (!peer) {
       setError('Connection not established. Start a call first.');
       return;
     }
+
+    negotiationInFlight.current = true;
+    setIsProcessingManualInput(true);
+    setDebugInfo('⏳ Setting remote data-channel answer…');
 
     try {
       await peer.setRemoteDescription(normalizeDescription(handshake));
@@ -444,6 +464,9 @@ function App() {
     } catch (answerError) {
       console.error('Error setting final answer:', answerError);
       setError(`Handshake failed: ${(answerError as Error).message}`);
+    } finally {
+      negotiationInFlight.current = false;
+      setIsProcessingManualInput(false);
     }
   };
 
@@ -472,8 +495,13 @@ function App() {
     if (handshake) void processAnswer(handshake);
   };
 
-  const handleManualInput = () => {
-    const value = manualInputVal.trim();
+  const handleManualInput = (inputValue = manualInputVal) => {
+    if (negotiationInFlight.current) {
+      setWarning('Connection is already being established. Please wait…');
+      return;
+    }
+
+    const value = inputValue.trim();
     if (!value) return;
     if (appState === AppState.SCANNING_OFFER || appState === AppState.HOME) {
       const handshake = decodeExpectedHandshake(value, 'offer');
@@ -486,10 +514,21 @@ function App() {
     }
   };
 
+  const handleManualPaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
+    const text = event.clipboardData.getData('text');
+    if (!text.trim()) return;
+    event.preventDefault();
+    setManualInputVal(text);
+    handleManualInput(text);
+  };
+
   const handlePasteFromClipboard = async () => {
     try {
       const text = await navigator.clipboard.readText();
-      if (text) setManualInputVal(text);
+      if (text.trim()) {
+        setManualInputVal(text);
+        handleManualInput(text);
+      }
     } catch {
       setError('Could not access clipboard. Please paste the code manually.');
     }
@@ -679,8 +718,8 @@ function App() {
             <div className="absolute bottom-8 left-6 right-6 z-[60]">
               <div className="glass-panel p-4 rounded-2xl flex flex-col gap-3 shadow-neon-pink border border-secondary/20 bg-black/80">
                 <label className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Or paste compact code</label>
-                <input type="text" placeholder="v1|o/a|ufrag|pwd|fingerprint|ip:port" value={manualInputVal} onChange={(event) => setManualInputVal(event.target.value)} className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-3 text-sm text-white" />
-                <div className="flex gap-2"><button onClick={handlePasteFromClipboard} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-lg"><span className="material-symbols-outlined align-middle">content_paste</span> Paste</button><button onClick={handleManualInput} className="flex-1 bg-secondary text-black font-bold py-3 rounded-lg">Process code</button></div>
+                <input type="text" placeholder="v1|o/a|ufrag|pwd|fingerprint|ip:port" value={manualInputVal} onChange={(event) => setManualInputVal(event.target.value)} onPaste={handleManualPaste} disabled={isProcessingManualInput} className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-3 text-sm text-white disabled:opacity-50" />
+                <div className="flex gap-2"><button onClick={handlePasteFromClipboard} disabled={isProcessingManualInput} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-lg disabled:opacity-50"><span className="material-symbols-outlined align-middle">content_paste</span> Paste</button><button onClick={() => handleManualInput()} disabled={isProcessingManualInput || !manualInputVal.trim()} className="flex-1 bg-secondary text-black font-bold py-3 rounded-lg disabled:opacity-50">{isProcessingManualInput ? 'Connecting…' : 'Connect'}</button></div>
               </div>
             </div>
           </div>
