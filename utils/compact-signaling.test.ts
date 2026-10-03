@@ -1,0 +1,98 @@
+import { describe, expect, it } from 'vitest';
+import {
+  buildDataChannelSdp,
+  compactHandshakeFromSdp,
+  decodeCompactHandshake,
+  encodeCompactHandshake,
+  selectHostCandidates,
+  type CompactHandshake,
+} from './compact-signaling';
+
+const fingerprint = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=';
+const fingerprintHex = '00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F:10:11:12:13:14:15:16:17:18:19:1A:1B:1C:1D:1E:1F';
+
+const handshake: CompactHandshake = {
+  version: 1,
+  role: 'offer',
+  ufrag: 'offerUfrag',
+  pwd: 'offerPassword',
+  fingerprint,
+  candidates: [
+    { address: '192.168.1.20', port: 5001 },
+    { address: '10.0.0.4', port: 5002 },
+    { address: 'phone.local', port: 5003 },
+  ],
+};
+
+describe('compact signaling', () => {
+  it('round-trips the QR handshake without changing its fields', () => {
+    const encoded = encodeCompactHandshake(handshake);
+
+    expect(encoded).toBe(
+      `v1|o|offerUfrag|offerPassword|${fingerprint}|192.168.1.20:5001,10.0.0.4:5002,phone.local:5003`,
+    );
+    expect(decodeCompactHandshake(encoded)).toEqual(handshake);
+  });
+
+  it('selects three unique host candidates in LAN-first order', () => {
+    const candidates = selectHostCandidates([
+      'a=candidate:1 1 UDP 2130706431 10.0.0.4 5001 typ host',
+      'a=candidate:2 1 UDP 2130706430 192.168.1.20 5002 typ host',
+      'a=candidate:3 1 UDP 2122260223 192.168.1.21 5003 typ host',
+      'a=candidate:4 1 UDP 2122260222 192.168.1.20 5004 typ host',
+      'a=candidate:5 1 TCP 2122260221 192.168.1.22 5005 typ host',
+      'a=candidate:6 1 UDP 2122260220 203.0.113.10 5006 typ srflx raddr 192.168.1.20 rport 5006',
+      'a=candidate:7 1 UDP 2122260219 phone.local 5007 typ host',
+    ], '192.168.1.99');
+
+    expect(candidates).toEqual([
+      { address: '192.168.1.20', port: 5002 },
+      { address: '192.168.1.21', port: 5003 },
+      { address: '10.0.0.4', port: 5001 },
+    ]);
+  });
+
+  it('extracts a compact handshake from data-channel SDP', () => {
+    const sdp = [
+      'v=0',
+      'a=ice-ufrag:offerUfrag',
+      'a=ice-pwd:offerPassword',
+      `a=fingerprint:sha-256 ${fingerprintHex}`,
+      'a=candidate:1 1 UDP 2130706431 192.168.1.20 5001 typ host',
+      'a=candidate:2 1 UDP 2130706430 phone.local 5002 typ host',
+      'a=candidate:3 1 UDP 2122260229 10.0.0.4 5003 typ host',
+    ].join('\r\n');
+
+    expect(decodeCompactHandshake(compactHandshakeFromSdp('offer', sdp))).toEqual({
+      ...handshake,
+      candidates: [
+        { address: '192.168.1.20', port: 5001 },
+        { address: '10.0.0.4', port: 5003 },
+        { address: 'phone.local', port: 5002 },
+      ],
+    });
+  });
+
+  it('builds a valid data-channel SDP template for both roles', () => {
+    const offerSdp = buildDataChannelSdp(handshake, { sessionId: '123' });
+    const answerSdp = buildDataChannelSdp({ ...handshake, role: 'answer' });
+
+    expect(offerSdp).toContain('m=application 9 UDP/DTLS/SCTP webrtc-datachannel');
+    expect(offerSdp).toContain('a=setup:actpass');
+    expect(offerSdp).toContain('a=sctp-port:5000');
+    expect(offerSdp).toContain(`a=fingerprint:sha-256 ${fingerprintHex}`);
+    expect(offerSdp.match(/^a=candidate:/gm)).toHaveLength(3);
+    expect(offerSdp).toContain('o=- 123 2 IN IP4 0.0.0.0');
+    expect(answerSdp).toContain('a=setup:active');
+  });
+
+  it('rejects malformed fingerprints and duplicate candidate addresses', () => {
+    expect(() => decodeCompactHandshake('v1|o|ufrag|pwd|not-base64|192.168.1.20:5001')).toThrow(
+      'Compact handshake fingerprint',
+    );
+
+    expect(() => decodeCompactHandshake(
+      `v1|o|ufrag|pwd|${fingerprint}|192.168.1.20:5001,192.168.1.20:5002`,
+    )).toThrow('candidates must be unique');
+  });
+});
