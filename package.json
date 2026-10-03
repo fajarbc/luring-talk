@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:gh-pages": "vite build && node fix-paths.cjs",
     "preview": "vite preview",
+    "test": "vitest run",
     "cert": "node scripts/gen-cert.mjs",
     "start": "node server.js"
   },
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^5.1.4"
+    "vite": "^5.1.4",
+    "vitest": "^2.1.9"
   }
 }
