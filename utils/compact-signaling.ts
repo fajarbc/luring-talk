@@ -27,9 +27,9 @@ export interface CompactHandshake {
 const COMPACT_VERSION = 'v1';
 const MAX_CANDIDATES = 3;
 const SHA256_FINGERPRINT_BYTES = 32;
-const PRIVATE_IPV4 = /^(10|127)\\.(?:\\d{1,3}\\.){2}\\d{1,3}$|^192\\.168\\.(?:\\d{1,3})\\.\\d{1,3}$|^172\\.(?:1[6-9]|2\\d|3[0-1])\\.(?:\\d{1,3}\\.)\\d{1,3}$/;
-const IPV4 = /^\\d{1,3}(?:\\.\\d{1,3}){3}$/;
-const MDNS = /^[a-z0-9-]+\\.local$/i;
+const PRIVATE_IPV4 = /^10\.(?:\d{1,3}\.){2}\d{1,3}$|^192\.168\.(?:\d{1,3})\.\d{1,3}$|^172\.(?:1[6-9]|2\d|3[0-1])\.(?:\d{1,3}\.)\d{1,3}$/;
+const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+const MDNS = /^[a-z0-9-]+\.local$/i;
 
 const toBase64 = (bytes: Uint8Array): string => {
   let binary = '';
@@ -70,7 +70,7 @@ interface ParsedSdpCandidate extends CompactCandidate {
 }
 
 const parseCandidateLine = (line: string, sourceIndex: number): ParsedSdpCandidate | null => {
-  const fields = line.trim().split(/\\s+/);
+  const fields = line.trim().split(/\s+/);
   if (fields.length < 8 || !fields[0].startsWith('a=candidate:')) return null;
   if (fields[2].toLowerCase() !== 'udp' || fields[6].toLowerCase() !== 'typ' || fields[7].toLowerCase() !== 'host') return null;
 
@@ -182,7 +182,7 @@ export const encodeCompactHandshake = (handshake: CompactHandshake): string => {
 const parseCandidateToken = (token: string): CompactCandidate => {
   const separator = token.lastIndexOf(':');
   if (separator <= 0) throw new Error('Compact handshake candidate is missing its port.');
-  const address = token.slice(0, separator).replace(/^\\[|\\]$/g, '');
+  const address = token.slice(0, separator).replace(/^\[|\]$/g, '');
   const port = Number(token.slice(separator + 1));
   if (!isUsableHostAddress(address) || !isValidPort(port)) {
     throw new Error('Compact handshake contains an invalid host candidate.');
@@ -229,7 +229,7 @@ export const compactHandshakeFromSdp = (
   sdp: string,
   preferredSubnet?: string,
 ): string => {
-  const lines = sdp.replace(/\\r/g, '').split('\\n').map((line) => line.trim()).filter(Boolean);
+  const lines = sdp.replace(/\r/g, '').split('\n').map((line) => line.trim()).filter(Boolean);
   const candidateLines = lines.filter((line) => line.startsWith('a=candidate:'));
   const candidates = selectHostCandidates(candidateLines, preferredSubnet);
   if (!candidates.length) throw new Error('SDP contains no usable private host candidates.');
@@ -283,5 +283,5 @@ export const buildDataChannelSdp = (
     ...candidateLines,
     'a=end-of-candidates',
     '',
-  ].join('\\r\\n');
+  ].join('\r\n');
 };
