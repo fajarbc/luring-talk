@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/generate-pwa-icons.mjs",
+    "prebuild": "node scripts/generate-pwa-icons.mjs && node scripts/verify-pwa-icons.mjs",
     "build": "vite build",
-    "prebuild:gh-pages": "node scripts/generate-pwa-icons.mjs",
+    "prebuild:gh-pages": "node scripts/generate-pwa-icons.mjs && node scripts/verify-pwa-icons.mjs",
     "build:gh-pages": "vite build && node fix-paths.cjs",
+    "verify:pwa-icons": "node scripts/verify-pwa-icons.mjs",
     "preview": "vite preview",
     "cert": "node scripts/gen-cert.mjs",
     "start": "node server.js"
