@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'prompt',
+        injectRegister: null,
         includeAssets: ['icon.svg'],
         manifest: {
           name: 'LuringTalk Call',
