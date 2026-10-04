@@ -52,6 +52,38 @@ describe('compact signaling', () => {
     ]);
   });
 
+  it('keeps the detected LAN candidate ahead of Docker and VPN interfaces', () => {
+    const candidates = selectHostCandidates([
+      'a=candidate:1 1 UDP 2130706431 172.20.0.2 5001 typ host',
+      'a=candidate:2 1 UDP 2130706430 10.8.0.2 5002 typ host',
+      'a=candidate:3 1 UDP 2122260223 192.168.44.12 5003 typ host',
+      'a=candidate:4 1 UDP 2122260222 192.168.44.12 5004 typ host',
+      'a=candidate:5 1 UDP 2122260221 192.168.44.13 5005 typ host',
+    ], '192.168.44.1');
+
+    expect(candidates).toEqual([
+      { address: '192.168.44.12', port: 5003 },
+      { address: '192.168.44.13', port: 5005 },
+      { address: '172.20.0.2', port: 5001 },
+    ]);
+  });
+
+  it('uses valid mDNS candidates only after filtering unusable host lines', () => {
+    const candidates = selectHostCandidates([
+      'a=candidate:1 1 UDP 2130706431 127.0.0.1 5001 typ host',
+      'a=candidate:2 1 UDP 2130706430 8.8.8.8 5002 typ host',
+      'a=candidate:3 1 UDP 2122260223 192.168.1.20 5003 typ srflx raddr 192.168.1.21 rport 5003',
+      'a=candidate:4 1 TCP 2122260222 192.168.1.21 5004 typ host',
+      'a=candidate:5 1 UDP 2122260221 phone.local 5005 typ host',
+      'a=candidate:6 1 UDP 2122260220 tablet.local 5006 typ host',
+    ]);
+
+    expect(candidates).toEqual([
+      { address: 'phone.local', port: 5005 },
+      { address: 'tablet.local', port: 5006 },
+    ]);
+  });
+
   it('extracts a compact handshake from data-channel SDP', () => {
     const sdp = [
       'v=0',
