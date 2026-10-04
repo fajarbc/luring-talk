@@ -75,10 +75,9 @@ export const formatSDPForQR = (data: any): string => {
     const lines = sdp.sdp.split('\n');
     const compressedLines: string[] = [];
     let mediaIndex = -1;
-    const mediaCodecs: {[key: number]: string[]} = {};
     const keptCandidateForMedia: {[key: number]: boolean} = {};
     const keptAnyCandidateForMedia: {[key: number]: boolean} = {};
-
+    
     const isPrivateIp = (ip: string) => {
       if (ip.startsWith('10.')) return true;
       if (ip.startsWith('192.168.')) return true;
@@ -91,14 +90,9 @@ export const formatSDPForQR = (data: any): string => {
       const trimmed = line.trim();
       if (!trimmed) continue;
       
-      // Track media sections and extract codecs
+      // Track media sections
       if (line.startsWith('m=')) {
         mediaIndex++;
-        // Extract codec numbers from m= line (e.g., "m=audio 40446 UDP/TLS/RTP/SAVPF 111 63 9...")
-        const parts = line.split(' ');
-        if (parts.length > 3) {
-          mediaCodecs[mediaIndex] = parts.slice(3); // codecs are everything after port and protocol
-        }
         compressedLines.push(line);
         continue;
       }

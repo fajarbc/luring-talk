@@ -378,14 +378,6 @@ function App() {
     setAppState(AppState.HOME);
   };
 
-  const startDebugCall = async () => {
-    const stream = await captureLocalMedia();
-    if (!stream) return;
-    setRemoteStream(stream);
-    setWarning('Debug mode: joined video call.');
-    setAppState(AppState.CONNECTED);
-  };
-
   const startCall = async () => {
     setError(null);
     setDebugInfo('⏳ Creating data-channel offer…');
