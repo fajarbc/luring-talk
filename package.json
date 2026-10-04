@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/generate-pwa-icons.mjs",
     "build": "vite build",
+    "prebuild:gh-pages": "node scripts/generate-pwa-icons.mjs",
     "build:gh-pages": "vite build && node fix-paths.cjs",
     "preview": "vite preview",
     "cert": "node scripts/gen-cert.mjs",
