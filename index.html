@@ -16,53 +16,6 @@
     <link rel="manifest" href="%BASE_URL%manifest.json" />
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%icon.svg" />
     <link rel="apple-touch-icon" href="%BASE_URL%icon.svg" />
-
-    <!-- Tailwind CSS (Cached by SW for offline) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              background: "#050505",
-              surface: "#121212",
-              primary: "#00f0ff", /* Neon Cyan */
-              secondary: "#ff0099", /* Neon Pink */
-              accent: "#39ff14", /* Neon Green */
-              "glass": "rgba(255, 255, 255, 0.05)",
-            },
-            fontFamily: {
-              sans: ["Inter Variable", "sans-serif"],
-              mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"],
-            },
-            boxShadow: {
-              "neon-cyan": "0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3)",
-              "neon-pink": "0 0 10px rgba(255, 0, 153, 0.5), 0 0 20px rgba(255, 0, 153, 0.3)",
-              "neon-green": "0 0 10px rgba(57, 255, 20, 0.5), 0 0 20px rgba(57, 255, 20, 0.3)",
-            },
-            animation: {
-              "glow": "glow 2s ease-in-out infinite alternate",
-            },
-            keyframes: {
-              glow: {
-                "0%": { textShadow: "0 0 5px rgba(255,255,255,0.5)" },
-                "100%": { textShadow: "0 0 20px rgba(255,255,255,0.8), 0 0 10px rgba(0,240,255,0.5)" },
-              }
-            }
-          },
-        },
-      }
-    </script>
-    <style>
-      body { background-color: #050505; color: #ffffff; }
-      ::-webkit-scrollbar { width: 0px; background: transparent; }
-      .glass-panel {
-        background: rgba(255, 255, 255, 0.03);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-      }
-    </style>
   </head>
   <body>
     <div id="root"></div>
