@@ -29,5 +29,10 @@ export default defineConfig(({ mode }) => {
       host: true,
       port: 3000,
     },
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, '.'),
+      },
+    },
   };
 });
