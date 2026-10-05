@@ -318,7 +318,7 @@ function App() {
     let settled = false;
     let timeoutId: number | undefined;
     let checkInterval: number | undefined;
-    let cancel = () => undefined;
+    let cancel: () => void = () => undefined;
 
     const settle = (completed: boolean) => {
       if (settled) return;
