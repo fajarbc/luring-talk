@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "verify:offline-tailwind": "node scripts/verify-offline-tailwind.mjs",
     "build:gh-pages": "vite build && node fix-paths.cjs",
     "preview": "vite preview",
     "cert": "node scripts/gen-cert.mjs",
@@ -22,7 +23,9 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.13",
     "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^5.1.4"
+    "tailwindcss": "^4.1.13",
+    "vite": "^8.3.2"
   }
 }

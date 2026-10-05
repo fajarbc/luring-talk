@@ -3,8 +3,7 @@ const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/icon.svg',
-  'https://cdn.tailwindcss.com'
+  '/icon.svg'
 ];
 
 self.addEventListener('install', (event) => {
@@ -28,25 +27,18 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      // Return cached response if found
       if (cachedResponse) return cachedResponse;
 
-      // Network request
       return fetch(event.request).then((response) => {
-        // Check if we received a valid response
         if (!response || response.status !== 200 || response.type !== 'basic' && response.type !== 'cors') {
           return response;
         }
 
-        // Cache the new resource (dynamic caching for hashed files from build and other assets)
-        const url = new URL(event.request.url);
-        // Cache external scripts (tailwind) or local assets
-        if (url.protocol.startsWith('http')) {
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, responseToCache);
-            });
-        }
+        // Cache successful HTTP resources for later offline use.
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
+        });
 
         return response;
       });

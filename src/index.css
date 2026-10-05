@@ -1,6 +1,81 @@
 @import '@fontsource-variable/inter/wght.css';
 @import 'material-symbols/outlined.css';
+@import "tailwindcss";
+
+@source "../App.tsx";
+@source "../components";
+
+@theme {
+  --color-background: #050505;
+  --color-surface: #121212;
+  --color-primary: #00f0ff;
+  --color-secondary: #ff0099;
+  --color-accent: #39ff14;
+  --color-glass: rgb(255 255 255 / 0.05);
+  --font-sans: "Inter Variable", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --shadow-neon-cyan: 0 0 10px rgb(0 240 255 / 0.5), 0 0 20px rgb(0 240 255 / 0.3);
+  --shadow-neon-pink: 0 0 10px rgb(255 0 153 / 0.5), 0 0 20px rgb(255 0 153 / 0.3);
+  --shadow-neon-green: 0 0 10px rgb(57 255 20 / 0.5), 0 0 20px rgb(57 255 20 / 0.3);
+  --animate-glow: glow 2s ease-in-out infinite alternate;
+
+  @keyframes glow {
+    0% {
+      text-shadow: 0 0 5px rgb(255 255 255 / 0.5);
+    }
+    100% {
+      text-shadow: 0 0 20px rgb(255 255 255 / 0.8), 0 0 10px rgb(0 240 255 / 0.5);
+    }
+  }
+}
 
 :root {
   font-family: 'Inter Variable', sans-serif;
 }
+
+body {
+  background-color: #050505;
+  color: #ffffff;
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  background: transparent;
+}
+
+.glass-panel {
+  background: rgb(255 255 255 / 0.03);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgb(255 255 255 / 0.1);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes zoom-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slide-in-from-top-4 {
+  from { opacity: 0; transform: translateY(-1rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-from-bottom-4 {
+  from { opacity: 0; transform: translateY(1rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in {
+  animation-duration: var(--tw-duration, 150ms);
+  animation-fill-mode: both;
+}
+
+.fade-in { animation-name: fade-in; }
+.zoom-in { animation-name: zoom-in; }
+.slide-in-from-top-4 { animation-name: slide-in-from-top-4; }
+.slide-in-from-bottom-4 { animation-name: slide-in-from-bottom-4; }
