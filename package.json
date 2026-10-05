@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "verify:offline-tailwind": "node scripts/verify-offline-tailwind.mjs",
     "build:gh-pages": "vite build && node fix-paths.cjs",
     "preview": "vite preview",
     "cert": "node scripts/gen-cert.mjs",
