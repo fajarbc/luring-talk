@@ -56,6 +56,7 @@ function App() {
   const ignoreOffer = useRef(false);
   const isSettingRemoteAnswerPending = useRef(false);
   const negotiationInFlight = useRef(false);
+  const iceGatheringWaitCleanup = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (localStream.current && bgVideoRef.current) {
@@ -315,21 +316,39 @@ function App() {
     return peer;
   }, [appendDebug, sendDataChannelMessage, sendLocalDescription, setupDataChannel]);
 
-  const waitForIceGathering = (peer: RTCPeerConnection) => new Promise<void>((resolve) => {
+  const waitForIceGathering = (peer: RTCPeerConnection) => new Promise<boolean>((resolve) => {
+    let settled = false;
+    let timeoutId: number | undefined;
+    let checkInterval: number | undefined;
+    let cancel: () => void = () => undefined;
+
+    const settle = (completed: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (checkInterval !== undefined) window.clearInterval(checkInterval);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      if (iceGatheringWaitCleanup.current === cancel) {
+        iceGatheringWaitCleanup.current = null;
+      }
+      resolve(completed);
+    };
+
+    cancel = () => settle(false);
+    iceGatheringWaitCleanup.current?.();
+    iceGatheringWaitCleanup.current = cancel;
+
     if (peer.iceGatheringState === 'complete') {
-      resolve();
+      settle(true);
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
+    timeoutId = window.setTimeout(() => {
       setWarning('Network discovery is taking longer than expected…');
-      resolve();
+      settle(true);
     }, ICE_GATHERING_TIMEOUT);
-    const checkInterval = window.setInterval(() => {
+    checkInterval = window.setInterval(() => {
       if (peer.iceGatheringState === 'complete') {
-        window.clearInterval(checkInterval);
-        window.clearTimeout(timeoutId);
-        resolve();
+        settle(true);
       }
     }, 100);
   });
@@ -352,6 +371,7 @@ function App() {
   };
 
   const endCall = () => {
+    iceGatheringWaitCleanup.current?.();
     localStream.current?.getTracks().forEach((track) => track.stop());
     localStream.current = null;
     dataChannel.current?.close();
@@ -389,7 +409,7 @@ function App() {
       setupDataChannel(peer, channel, false);
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
-      await waitForIceGathering(peer);
+      if (!await waitForIceGathering(peer)) return;
       const sdp = peer.localDescription?.sdp;
       if (!sdp) throw new Error('Peer did not produce an offer SDP.');
       const compactOffer = compactHandshakeFromSdp('offer', sdp);
@@ -417,7 +437,7 @@ function App() {
       await peer.setRemoteDescription(normalizeDescription(handshake));
       const answer = await peer.createAnswer();
       await peer.setLocalDescription(answer);
-      await waitForIceGathering(peer);
+      if (!await waitForIceGathering(peer)) return;
       const sdp = peer.localDescription?.sdp;
       if (!sdp) throw new Error('Peer did not produce an answer SDP.');
       const compactAnswer = compactHandshakeFromSdp('answer', sdp);
