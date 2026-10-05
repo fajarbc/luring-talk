@@ -1,24 +1,45 @@
 import { useEffect, useState } from 'react';
-import { registerSW } from 'virtual:pwa-register';
-
-type UpdateServiceWorker = (reloadPage?: boolean) => Promise<void>;
+import { Workbox } from 'workbox-window';
 
 /** Registers the generated service worker and surfaces offline/update state. */
 function UpdatePrompt() {
   const [offlineReady, setOfflineReady] = useState(false);
   const [needRefresh, setNeedRefresh] = useState(false);
-  const [updateServiceWorker, setUpdateServiceWorker] = useState<UpdateServiceWorker | null>(null);
+  const [updateServiceWorker, setUpdateServiceWorker] = useState<(() => void) | null>(null);
 
   useEffect(() => {
-    const update = registerSW({
-      onOfflineReady: () => setOfflineReady(true),
-      onNeedRefresh: () => setNeedRefresh(true),
-      onRegisterError: (registrationError) => {
-        console.error('Service worker registration failed:', registrationError);
-      },
+    if (import.meta.env.DEV || !('serviceWorker' in navigator)) return;
+
+    const workbox = new Workbox(`${import.meta.env.BASE_URL}sw.js`, {
+      scope: import.meta.env.BASE_URL,
+    });
+    let reloadAfterUpdate = false;
+
+    const onInstalled = (event: Event & { isUpdate?: boolean }) => {
+      if (!event.isUpdate) setOfflineReady(true);
+    };
+    const onWaiting = () => setNeedRefresh(true);
+    const onControlling = () => {
+      if (reloadAfterUpdate) window.location.reload();
+    };
+
+    workbox.addEventListener('installed', onInstalled);
+    workbox.addEventListener('waiting', onWaiting);
+    workbox.addEventListener('controlling', onControlling);
+    setUpdateServiceWorker(() => () => {
+      reloadAfterUpdate = true;
+      void workbox.messageSkipWaiting();
     });
 
-    setUpdateServiceWorker(() => update);
+    void workbox.register().catch((registrationError: unknown) => {
+      console.error('Service worker registration failed:', registrationError);
+    });
+
+    return () => {
+      workbox.removeEventListener('installed', onInstalled);
+      workbox.removeEventListener('waiting', onWaiting);
+      workbox.removeEventListener('controlling', onControlling);
+    };
   }, []);
 
   if (!offlineReady && !needRefresh) return null;
@@ -29,7 +50,7 @@ function UpdatePrompt() {
   };
 
   const applyUpdate = () => {
-    if (updateServiceWorker) void updateServiceWorker(true);
+    if (updateServiceWorker) updateServiceWorker();
   };
 
   return (
