@@ -7,6 +7,7 @@ import {
   buildDataChannelSdp,
   compactHandshakeFromSdp,
   decodeCompactHandshake,
+  getPrivateIpv4Subnet,
   CompactHandshake,
 } from './utils/compact-signaling';
 
@@ -28,6 +29,16 @@ const normalizeDescription = (handshake: CompactHandshake): RTCSessionDescriptio
   type: handshake.role === 'offer' ? 'offer' : 'answer',
   sdp: buildDataChannelSdp(handshake, { sessionId: String(Date.now()) }),
 });
+
+/**
+ * The local HTTPS server is normally opened through its LAN address when a
+ * second device needs to reach it. Use that hostname as a subnet hint; local
+ * development and GitHub Pages hosts simply return no preference.
+ */
+const getDetectedLanSubnet = (): string | undefined => {
+  if (typeof window === 'undefined') return undefined;
+  return getPrivateIpv4Subnet(window.location.hostname);
+};
 
 function App() {
   const [appState, setAppState] = useState<AppState>(AppState.HOME);
@@ -416,7 +427,7 @@ function App() {
       if (!await waitForIceGathering(peer)) return;
       const sdp = peer.localDescription?.sdp;
       if (!sdp) throw new Error('Peer did not produce an offer SDP.');
-      const compactOffer = compactHandshakeFromSdp('offer', sdp);
+      const compactOffer = compactHandshakeFromSdp('offer', sdp, getDetectedLanSubnet());
       await generateQR(compactOffer);
       setAppState(AppState.SHOWING_OFFER);
     } catch (startError) {
@@ -438,7 +449,7 @@ function App() {
       if (!await waitForIceGathering(peer)) return;
       const sdp = peer.localDescription?.sdp;
       if (!sdp) throw new Error('Peer did not produce an answer SDP.');
-      const compactAnswer = compactHandshakeFromSdp('answer', sdp);
+      const compactAnswer = compactHandshakeFromSdp('answer', sdp, getDetectedLanSubnet());
       initialHandshakeComplete.current = true;
       await generateQR(compactAnswer);
       setAppState(AppState.SHOWING_ANSWER);

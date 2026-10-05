@@ -55,6 +55,12 @@ const isPrivateIpv4 = (address: string): boolean => {
   return address.split('.').every((part) => Number(part) >= 0 && Number(part) <= 255);
 };
 
+/** Returns the /24 subnet for a private IPv4 address, or undefined for a hostname/public address. */
+export const getPrivateIpv4Subnet = (address: string): string | undefined => {
+  if (!isPrivateIpv4(address)) return undefined;
+  return address.split('.').slice(0, 3).join('.');
+};
+
 const isUsableHostAddress = (address: string): boolean => isPrivateIpv4(address) || MDNS.test(address);
 
 const isSameSubnet = (address: string, preferredSubnet?: string): boolean => {
