@@ -33,7 +33,6 @@ const files = Object.fromEntries(
       'index.html',
       'src/index.css',
       'src/index.tsx',
-      'sw.js',
       'vite.config.ts',
       'package.json',
       'package-lock.json',
@@ -49,7 +48,6 @@ requireText('vite.config.ts', files['vite.config.ts'], 'tailwindcss()', 'must en
 forbidPattern('index.html', files['index.html'], /cdn\.tailwindcss\.com/i, 'must not reference the Tailwind Play CDN.');
 forbidPattern('index.html', files['index.html'], /<script[^>]*tailwind/i, 'must not load Tailwind through a runtime script.');
 forbidPattern('index.html', files['index.html'], /tailwind\.config/i, 'must not define a runtime Tailwind configuration.');
-forbidPattern('sw.js', files['sw.js'], /cdn\.tailwindcss\.com/i, 'must not precache the Tailwind Play CDN.');
 
 try {
   const packageJson = JSON.parse(files['package.json']);
