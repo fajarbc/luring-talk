@@ -64,9 +64,14 @@ export const getPrivateIpv4Subnet = (address: string): string | undefined => {
 const isUsableHostAddress = (address: string): boolean => isPrivateIpv4(address) || MDNS.test(address);
 
 const isSameSubnet = (address: string, preferredSubnet?: string): boolean => {
-  if (!preferredSubnet || !isPrivateIpv4(address) || !isPrivateIpv4(preferredSubnet)) return false;
-  const addressParts = address.split('.');
+  if (!preferredSubnet || !isPrivateIpv4(address)) return false;
+
   const preferredParts = preferredSubnet.split('.');
+  if (preferredParts.length !== 3 && preferredParts.length !== 4) return false;
+  const preferredAddress = preferredParts.length === 3 ? `${preferredSubnet}.1` : preferredSubnet;
+  if (!isPrivateIpv4(preferredAddress)) return false;
+
+  const addressParts = address.split('.');
   return addressParts.slice(0, 3).join('.') === preferredParts.slice(0, 3).join('.');
 };
 
