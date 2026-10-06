@@ -60,6 +60,18 @@ describe('compact signaling', () => {
     ]);
   });
 
+  it('limits the candidate list without replacing the first port for a duplicate address', () => {
+    expect(selectHostCandidates([
+      'a=candidate:1 1 UDP 2130706431 10.0.0.4 5001 typ host',
+      'a=candidate:2 1 UDP 2130706430 192.168.1.20 5002 typ host',
+      'a=candidate:3 1 UDP 2122260229 192.168.1.20 5003 typ host',
+      'a=candidate:4 1 UDP 2122260228 172.20.0.2 5004 typ host',
+    ], undefined, 2)).toEqual([
+      { address: '10.0.0.4', port: 5001 },
+      { address: '192.168.1.20', port: 5002 },
+    ]);
+  });
+
   it('keeps the detected LAN candidate ahead of Docker and VPN interfaces in the compact handshake', () => {
     const sdp = [
       'v=0',
@@ -130,7 +142,7 @@ describe('compact signaling', () => {
     expect(answerSdp).toContain('a=setup:active');
   });
 
-  it('rejects malformed fingerprints and duplicate candidate addresses', () => {
+  it('rejects malformed fingerprints, duplicate candidate addresses, and invalid ports', () => {
     expect(() => decodeCompactHandshake('v1|o|ufrag|pwd|not-base64|192.168.1.20:5001')).toThrow(
       'Compact handshake fingerprint',
     );
@@ -138,5 +150,9 @@ describe('compact signaling', () => {
     expect(() => decodeCompactHandshake(
       `v1|o|ufrag|pwd|${fingerprint}|192.168.1.20:5001,192.168.1.20:5002`,
     )).toThrow('candidates must be unique');
+
+    expect(() => decodeCompactHandshake(
+      `v1|o|ufrag|pwd|${fingerprint}|192.168.1.20:0`,
+    )).toThrow('invalid host candidate');
   });
 });
