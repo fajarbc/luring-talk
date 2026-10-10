@@ -10,7 +10,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+graphify-out
 *.local
+*.pem
 
 # Editor directories and files
 .vscode/*

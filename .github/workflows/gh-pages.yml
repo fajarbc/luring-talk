@@ -25,6 +25,7 @@ jobs:
       - name: Build
         run: npm run build:gh-pages
         env:
+          VITE_BASE: /luring-talk/
           VITE_DEBUG_MODE: false
           
       - name: Add .nojekyll file

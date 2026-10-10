@@ -58,8 +58,8 @@ npm start
 
 ### 1. "Connection Failed" or Black Screen
 *   **Firewall**: Ensure the host (Device A) firewall is allowing traffic on port `8080`.
-    *   *Windows*: Allow Node.js through Windows Defender Firewall.
-    *   *Mac*: Check System Settings > Network > Firewall.
+    *   **Windows**: Allow Node.js through Windows Defender Firewall.
+    *   **Mac**: Check System Settings > Network > Firewall.
 *   **Different Networks**: Double-check that Device B is connected to Device A's specific Wi-Fi Hotspot.
 *   **IP Address**: Ensure you are typing the IP exactly as shown on the host screen.
 
@@ -72,25 +72,44 @@ npm start
 *   **Permissions**: Reset browser permissions for the site and Allow Camera/Mic.
 *   **HTTPS**: You **must** use `https://`. `http://` will block camera access on mobile.
 
+### 4. Verify transient Wi-Fi recovery
+Use this acceptance check after a call is connected:
+
+1. Keep both devices on the same Wi-Fi or hotspot and complete the QR exchange.
+2. Briefly disable Wi-Fi on one device for a few seconds, then enable it again. Keep the interruption shorter than the 20-second recovery timeout.
+3. Confirm that the affected call shows **Reconnecting…** while the link is unavailable.
+4. Confirm that the video and audio return and the UI shows **Connection restored.** without scanning either QR code again.
+5. If the call does not recover, wait for the recovery timeout and capture the browser/device details before retrying; the expected failure path is a clear connection error rather than a silent hang.
+
 ---
 
 ## 📊 Performance Notes
 
 *   **Connection Time**: Typically < 2 seconds after final scan.
 *   **Latency**: Very low (< 100ms) due to local LAN routing.
-*   **Codecs**: Uses VP8/Opus. 
+*   **Codecs**: Uses VP8/Opus.
 *   **Packet Loss**: WebRTC handles minor packet loss, but weak Wi-Fi signal will freeze video. Ensure devices are within range of the hotspot.
 
 ## 💻 Local Development Setup
 
-### 1. Generate SSL (Required)
-```bash
-openssl req -nodes -new -x509 -keyout key.pem -out cert.pem -days 365 -subj "/C=US/ST=State/L=City/O=LuringTalk/CN=localhost"
-```
-
-### 2. Run
+### 1. Install dependencies
 ```bash
 npm install
+```
+
+### 2. Generate local HTTPS certificates
+```bash
+npm run cert
+```
+
+This writes `key.pem` and `cert.pem` in the repo root for local development only. The script includes `localhost`, `*.local`, `127.0.0.1`, and detected LAN IPv4 addresses in the certificate SAN so other devices on the same hotspot/Wi-Fi can open the HTTPS URL.
+
+If `npm run cert` says OpenSSL is missing, install OpenSSL first. On Windows, Git Bash often already includes `openssl.exe`.
+
+If you want a smoother trusted-local-cert workflow, `mkcert` is usually the nicer option.
+
+### 3. Build and start the app
+```bash
 npm run build
 npm start
 ```
