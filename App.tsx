@@ -7,11 +7,13 @@ import {
   buildDataChannelSdp,
   compactHandshakeFromSdp,
   decodeCompactHandshake,
-  getPrivateIpv4Subnet,
   CompactHandshake,
 } from './utils/compact-signaling';
 
 const ICE_GATHERING_TIMEOUT = 10000;
+const DISCONNECT_GRACE_PERIOD = 5000;
+const RECOVERY_TIMEOUT = 20000;
+const MAX_ICE_RESTART_ATTEMPTS = 1;
 const DEBUG_MODE = import.meta.env.VITE_DEBUG_MODE === 'true';
 
 type ConnectionRole = 'offerer' | 'answerer';
@@ -30,16 +32,6 @@ const normalizeDescription = (handshake: CompactHandshake): RTCSessionDescriptio
   sdp: buildDataChannelSdp(handshake, { sessionId: String(Date.now()) }),
 });
 
-/**
- * The local HTTPS server is normally opened through its LAN address when a
- * second device needs to reach it. Use that hostname as a subnet hint; local
- * development and GitHub Pages hosts simply return no preference.
- */
-const getDetectedLanSubnet = (): string | undefined => {
-  if (typeof window === 'undefined') return undefined;
-  return getPrivateIpv4Subnet(window.location.hostname);
-};
-
 function App() {
   const [appState, setAppState] = useState<AppState>(AppState.HOME);
   const [localIP] = useState('LAN candidates from this device');
@@ -53,6 +45,8 @@ function App() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isProcessingManualInput, setIsProcessingManualInput] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   const pc = useRef<RTCPeerConnection | null>(null);
   const dataChannel = useRef<RTCDataChannel | null>(null);
@@ -65,6 +59,12 @@ function App() {
   const makingOffer = useRef(false);
   const ignoreOffer = useRef(false);
   const isSettingRemoteAnswerPending = useRef(false);
+  const negotiationInFlight = useRef(false);
+  const disconnectTimer = useRef<number | null>(null);
+  const recoveryTimeout = useRef<number | null>(null);
+  const recoveryStartedAt = useRef<number | null>(null);
+  const iceRestartAttempts = useRef(0);
+  const userEndedCall = useRef(false);
   const iceGatheringWaitCleanup = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -107,6 +107,77 @@ function App() {
   const appendDebug = useCallback((message: string) => {
     setDebugInfo((previous) => previous ? `${previous}\n${message}` : message);
   }, []);
+
+  const clearRecoveryTimers = useCallback((): boolean => {
+    const wasRecovering = recoveryStartedAt.current !== null;
+    if (disconnectTimer.current !== null) {
+      window.clearTimeout(disconnectTimer.current);
+      disconnectTimer.current = null;
+    }
+    if (recoveryTimeout.current !== null) {
+      window.clearTimeout(recoveryTimeout.current);
+      recoveryTimeout.current = null;
+    }
+    recoveryStartedAt.current = null;
+    iceRestartAttempts.current = 0;
+    setIsReconnecting(false);
+    return wasRecovering;
+  }, []);
+
+  const requestIceRestart = useCallback((peer: RTCPeerConnection) => {
+    if (
+      userEndedCall.current ||
+      pc.current !== peer ||
+      iceRestartAttempts.current >= MAX_ICE_RESTART_ATTEMPTS
+    ) {
+      return;
+    }
+
+    iceRestartAttempts.current += 1;
+    appendDebug(`🔁 Restarting ICE (attempt ${iceRestartAttempts.current}/${MAX_ICE_RESTART_ATTEMPTS})`);
+    try {
+      peer.restartIce();
+    } catch (restartError) {
+      console.error('ICE restart failed:', restartError);
+      clearRecoveryTimers();
+      setError(`Connection recovery failed: ${(restartError as Error).message}`);
+    }
+  }, [appendDebug, clearRecoveryTimers]);
+
+  const armConnectionRecovery = useCallback((peer: RTCPeerConnection, restartImmediately = false) => {
+    if (userEndedCall.current || pc.current !== peer) return;
+
+    if (recoveryStartedAt.current === null) {
+      recoveryStartedAt.current = Date.now();
+      appendDebug('⚠️ Connection interrupted; allowing a short recovery window');
+    }
+    setIsReconnecting(true);
+
+    if (recoveryTimeout.current === null) {
+      recoveryTimeout.current = window.setTimeout(() => {
+        recoveryTimeout.current = null;
+        if (userEndedCall.current || pc.current !== peer || peer.connectionState === 'connected') return;
+        clearRecoveryTimers();
+        setError('Connection failed after 20 seconds of recovery attempts. Please retry the call.');
+      }, RECOVERY_TIMEOUT);
+    }
+
+    if (restartImmediately) {
+      if (disconnectTimer.current !== null) {
+        window.clearTimeout(disconnectTimer.current);
+        disconnectTimer.current = null;
+      }
+      requestIceRestart(peer);
+      return;
+    }
+
+    if (disconnectTimer.current !== null || iceRestartAttempts.current >= MAX_ICE_RESTART_ATTEMPTS) return;
+    disconnectTimer.current = window.setTimeout(() => {
+      disconnectTimer.current = null;
+      if (userEndedCall.current || pc.current !== peer || peer.connectionState === 'connected') return;
+      requestIceRestart(peer);
+    }, DISCONNECT_GRACE_PERIOD);
+  }, [appendDebug, clearRecoveryTimers, requestIceRestart]);
 
   const captureLocalMedia = useCallback(async (): Promise<MediaStream | null> => {
     const audio = {
@@ -262,6 +333,8 @@ function App() {
   }, [appendDebug, handleDataChannelMessage, startMediaAndRenegotiate]);
 
   const initializePeerConnection = useCallback(async (connectionRole: ConnectionRole) => {
+    userEndedCall.current = false;
+    clearRecoveryTimers();
     const peer = new RTCPeerConnection({
       iceServers: [],
       iceTransportPolicy: 'all',
@@ -307,9 +380,28 @@ function App() {
     };
 
     peer.onconnectionstatechange = () => {
-      appendDebug(`🔗 Connection: ${peer.connectionState}`);
-      if (peer.connectionState === 'failed') {
-        setError('Connection failed. Please retry the call.');
+      const connectionState = peer.connectionState;
+      appendDebug(`🔗 Connection: ${connectionState}`);
+      if (connectionState === 'connected') {
+        const wasRecovering = clearRecoveryTimers();
+        if (wasRecovering && !userEndedCall.current) {
+          setWarning('Connection restored.');
+        }
+        return;
+      }
+      if (connectionState === 'disconnected') {
+        armConnectionRecovery(peer);
+        return;
+      }
+      if (connectionState === 'failed') {
+        if (iceRestartAttempts.current < MAX_ICE_RESTART_ATTEMPTS) {
+          armConnectionRecovery(peer, true);
+          return;
+        }
+        if (!userEndedCall.current && pc.current === peer) {
+          clearRecoveryTimers();
+          setError('Connection failed after retrying ICE. Please retry the call.');
+        }
       }
     };
 
@@ -323,7 +415,7 @@ function App() {
 
     pc.current = peer;
     return peer;
-  }, [appendDebug, sendDataChannelMessage, sendLocalDescription, setupDataChannel]);
+  }, [appendDebug, armConnectionRecovery, clearRecoveryTimers, sendDataChannelMessage, sendLocalDescription, setupDataChannel]);
 
   const waitForIceGathering = (peer: RTCPeerConnection) => new Promise<boolean>((resolve) => {
     let settled = false;
@@ -381,6 +473,8 @@ function App() {
 
   const endCall = () => {
     iceGatheringWaitCleanup.current?.();
+    userEndedCall.current = true;
+    clearRecoveryTimers();
     localStream.current?.getTracks().forEach((track) => track.stop());
     localStream.current = null;
     dataChannel.current?.close();
@@ -394,6 +488,8 @@ function App() {
     makingOffer.current = false;
     ignoreOffer.current = false;
     isSettingRemoteAnswerPending.current = false;
+    negotiationInFlight.current = false;
+    setIsProcessingManualInput(false);
     setRemoteStream(null);
     setQrCodeData(null);
     setSignalString('');
@@ -427,7 +523,7 @@ function App() {
       if (!await waitForIceGathering(peer)) return;
       const sdp = peer.localDescription?.sdp;
       if (!sdp) throw new Error('Peer did not produce an offer SDP.');
-      const compactOffer = compactHandshakeFromSdp('offer', sdp, getDetectedLanSubnet());
+      const compactOffer = compactHandshakeFromSdp('offer', sdp);
       await generateQR(compactOffer);
       setAppState(AppState.SHOWING_OFFER);
     } catch (startError) {
@@ -437,6 +533,12 @@ function App() {
   };
 
   const processOffer = async (handshake: CompactHandshake) => {
+    if (negotiationInFlight.current) {
+      setWarning('Connection is already being established. Please wait…');
+      return;
+    }
+    negotiationInFlight.current = true;
+    setIsProcessingManualInput(true);
     setError(null);
     setDebugInfo('⏳ Rebuilding data-channel offer…');
     setAppState(AppState.GENERATING_ANSWER);
@@ -449,7 +551,7 @@ function App() {
       if (!await waitForIceGathering(peer)) return;
       const sdp = peer.localDescription?.sdp;
       if (!sdp) throw new Error('Peer did not produce an answer SDP.');
-      const compactAnswer = compactHandshakeFromSdp('answer', sdp, getDetectedLanSubnet());
+      const compactAnswer = compactHandshakeFromSdp('answer', sdp);
       initialHandshakeComplete.current = true;
       await generateQR(compactAnswer);
       setAppState(AppState.SHOWING_ANSWER);
@@ -457,16 +559,26 @@ function App() {
       console.error('Error establishing answer:', offerError);
       setError(`Connection failed during data-channel setup: ${(offerError as Error).message}`);
       endCall();
+    } finally {
+      negotiationInFlight.current = false;
+      setIsProcessingManualInput(false);
     }
   };
 
   const processAnswer = async (handshake: CompactHandshake) => {
-    setDebugInfo('⏳ Setting remote data-channel answer…');
+    if (negotiationInFlight.current) {
+      setWarning('Connection is already being established. Please wait…');
+      return;
+    }
     const peer = pc.current;
     if (!peer) {
       setError('Connection not established. Start a call first.');
       return;
     }
+
+    negotiationInFlight.current = true;
+    setIsProcessingManualInput(true);
+    setDebugInfo('⏳ Setting remote data-channel answer…');
 
     try {
       await peer.setRemoteDescription(normalizeDescription(handshake));
@@ -475,6 +587,9 @@ function App() {
     } catch (answerError) {
       console.error('Error setting final answer:', answerError);
       setError(`Handshake failed: ${(answerError as Error).message}`);
+    } finally {
+      negotiationInFlight.current = false;
+      setIsProcessingManualInput(false);
     }
   };
 
@@ -503,8 +618,13 @@ function App() {
     if (handshake) void processAnswer(handshake);
   };
 
-  const handleManualInput = () => {
-    const value = manualInputVal.trim();
+  const handleManualInput = (inputValue = manualInputVal) => {
+    if (negotiationInFlight.current) {
+      setWarning('Connection is already being established. Please wait…');
+      return;
+    }
+
+    const value = inputValue.trim();
     if (!value) return;
     if (appState === AppState.SCANNING_OFFER || appState === AppState.HOME) {
       const handshake = decodeExpectedHandshake(value, 'offer');
@@ -517,10 +637,21 @@ function App() {
     }
   };
 
+  const handleManualPaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
+    const text = event.clipboardData.getData('text');
+    if (!text.trim()) return;
+    event.preventDefault();
+    setManualInputVal(text);
+    handleManualInput(text);
+  };
+
   const handlePasteFromClipboard = async () => {
     try {
       const text = await navigator.clipboard.readText();
-      if (text) setManualInputVal(text);
+      if (text.trim()) {
+        setManualInputVal(text);
+        handleManualInput(text);
+      }
     } catch {
       setError('Could not access clipboard. Please paste the code manually.');
     }
@@ -595,6 +726,12 @@ function App() {
           onEndCall={endCall}
           onSwitchCamera={switchCamera}
         />
+        {isReconnecting && (
+          <div role="status" aria-live="polite" className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-yellow-500/90 text-black px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2">
+            <span className="material-symbols-outlined animate-spin text-sm">sync</span>
+            Reconnecting…
+          </div>
+        )}
         {warning && (
           <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-yellow-500/90 text-black px-6 py-3 rounded-full font-bold shadow-lg">
             {warning}
@@ -710,8 +847,8 @@ function App() {
             <div className="absolute bottom-8 left-6 right-6 z-[60]">
               <div className="glass-panel p-4 rounded-2xl flex flex-col gap-3 shadow-neon-pink border border-secondary/20 bg-black/80">
                 <label className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Or paste compact code</label>
-                <input type="text" placeholder="v1|o/a|ufrag|pwd|fingerprint|ip:port" value={manualInputVal} onChange={(event) => setManualInputVal(event.target.value)} className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-3 text-sm text-white" />
-                <div className="flex gap-2"><button onClick={handlePasteFromClipboard} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-lg"><span className="material-symbols-outlined align-middle">content_paste</span> Paste</button><button onClick={handleManualInput} className="flex-1 bg-secondary text-black font-bold py-3 rounded-lg">Process code</button></div>
+                <input type="text" placeholder="v1|o/a|ufrag|pwd|fingerprint|ip:port" value={manualInputVal} onChange={(event) => setManualInputVal(event.target.value)} onPaste={handleManualPaste} disabled={isProcessingManualInput} className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-3 text-sm text-white disabled:opacity-50" />
+                <div className="flex gap-2"><button onClick={handlePasteFromClipboard} disabled={isProcessingManualInput} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-lg disabled:opacity-50"><span className="material-symbols-outlined align-middle">content_paste</span> Paste</button><button onClick={() => handleManualInput()} disabled={isProcessingManualInput || !manualInputVal.trim()} className="flex-1 bg-secondary text-black font-bold py-3 rounded-lg disabled:opacity-50">{isProcessingManualInput ? 'Connecting…' : 'Connect'}</button></div>
               </div>
             </div>
           </div>
