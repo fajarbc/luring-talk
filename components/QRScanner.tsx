@@ -14,6 +14,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, instruction }) =
   const rafRef = useRef<number | null>(null);
   const frameCallbackRef = useRef<number | null>(null);
   const scannedRef = useRef<boolean>(false);
+  const onScanRef = useRef(onScan);
   const [error, setError] = useState<string>('');
   const [isStarting, setIsStarting] = useState<boolean>(true);
   const [statusText, setStatusText] = useState<string>('Initializing camera...');
@@ -23,6 +24,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, instruction }) =
   const [torchOn, setTorchOn] = useState<boolean>(false);
   const [restartCounter, setRestartCounter] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    onScanRef.current = onScan;
+  }, [onScan]);
 
   useEffect(() => {
     const stopCamera = () => {
@@ -136,7 +141,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, instruction }) =
             console.log('QR code detected!');
             scannedRef.current = true;
             stopCamera();
-            onScan(code.data);
+            onScanRef.current(code.data);
             return;
           }
         }
@@ -186,7 +191,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, instruction }) =
 
       if (code) {
         console.log('QR code detected from image!');
-        onScan(code.data);
+        onScanRef.current(code.data);
       } else {
         setError('No QR code found in the image. Try a clearer screenshot.');
       }

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 interface VideoCallProps {
   localStream: MediaStream;
@@ -19,6 +19,18 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
   const [localPos, setLocalPos] = useState({ x: 16, y: 16 });
   const [isDraggingLocal, setIsDraggingLocal] = useState(false);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
+
+  const clampLocalPosition = useCallback((nextX: number, nextY: number) => {
+    const wrapper = localVideoWrapperRef.current;
+    if (!wrapper) return { x: nextX, y: nextY };
+    const rect = wrapper.getBoundingClientRect();
+    const maxX = Math.max(0, window.innerWidth - rect.width);
+    const maxY = Math.max(0, window.innerHeight - rect.height);
+    return {
+      x: Math.min(Math.max(0, nextX), maxX),
+      y: Math.min(Math.max(0, nextY), maxY),
+    };
+  }, []);
 
   // 1. Timer logic
   useEffect(() => {
@@ -105,7 +117,7 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [clampLocalPosition]);
 
   const toggleAudio = () => {
     localStream.getAudioTracks().forEach(track => {
@@ -127,18 +139,6 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
 
   const handleLocalVideoError = (e: any) => {
     console.error("Local video error:", e);
-  };
-
-  const clampLocalPosition = (nextX: number, nextY: number) => {
-    const wrapper = localVideoWrapperRef.current;
-    if (!wrapper) return { x: nextX, y: nextY };
-    const rect = wrapper.getBoundingClientRect();
-    const maxX = Math.max(0, window.innerWidth - rect.width);
-    const maxY = Math.max(0, window.innerHeight - rect.height);
-    return {
-      x: Math.min(Math.max(0, nextX), maxX),
-      y: Math.min(Math.max(0, nextY), maxY),
-    };
   };
 
   const handleLocalPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {

@@ -13,6 +13,9 @@
     "verify:pwa-icons": "node scripts/verify-pwa-icons.mjs",
     "preview": "vite preview",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint App.tsx components src types.ts utils vite.config.ts",
+    "format": "prettier --write .",
     "cert": "node scripts/gen-cert.mjs",
     "start": "node server.js"
   },
@@ -27,11 +30,21 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.6",
+    "@types/react-dom": "^19.0.2",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
     "@tailwindcss/vite": "^4.1.13",
     "@vitejs/plugin-react": "^5.2.0",
     "tailwindcss": "^4.1.13",
     "vite": "^8.3.2",
     "vite-plugin-pwa": "^1.3.0",
-    "workbox-window": "^7.4.1"
+    "workbox-window": "^7.4.1",
+    "vitest": "^2.1.9"
   }
 }
