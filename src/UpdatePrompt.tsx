@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Workbox } from 'workbox-window';
+import type { WorkboxLifecycleEvent } from 'workbox-window';
 
 /** Registers the generated service worker and surfaces offline/update state. */
 function UpdatePrompt() {
@@ -15,7 +16,7 @@ function UpdatePrompt() {
     });
     let reloadAfterUpdate = false;
 
-    const onInstalled = (event: Event & { isUpdate?: boolean }) => {
+    const onInstalled = (event: WorkboxLifecycleEvent) => {
       if (!event.isUpdate) setOfflineReady(true);
     };
     const onWaiting = () => setNeedRefresh(true);

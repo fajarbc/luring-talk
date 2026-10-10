@@ -47,7 +47,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, instruction }) =
       const caps = track.getCapabilities?.();
       if (caps && 'torch' in caps) {
         try {
-          await track.applyConstraints({ advanced: [{ torch: enabled }] });
+          await track.applyConstraints({ advanced: [{ torch: enabled } as MediaTrackConstraintSet & { torch: boolean }] });
           setTorchOn(enabled);
         } catch (err) {
           console.error('Torch apply error:', err);
