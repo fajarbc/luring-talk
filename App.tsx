@@ -419,7 +419,9 @@ function App() {
 
   const waitForIceGathering = (peer: RTCPeerConnection) => new Promise<boolean>((resolve) => {
     let settled = false;
+    // eslint-disable-next-line prefer-const -- assigned after the early-completion check; settle may run before initialization.
     let timeoutId: number | undefined;
+    // eslint-disable-next-line prefer-const -- assigned after the early-completion check; settle may run before initialization.
     let checkInterval: number | undefined;
     let cancel: () => void = () => undefined;
 
@@ -499,14 +501,6 @@ function App() {
     setError(null);
     setWarning(null);
     setAppState(AppState.HOME);
-  };
-
-  const startDebugCall = async () => {
-    const stream = await captureLocalMedia();
-    if (!stream) return;
-    setRemoteStream(stream);
-    setWarning('Debug mode: joined video call.');
-    setAppState(AppState.CONNECTED);
   };
 
   const startCall = async () => {
