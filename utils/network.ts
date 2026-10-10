@@ -1,53 +1,36 @@
 /**
- * Attempts to discover the local IP address using a dummy WebRTC connection.
- * This works by creating an RTCPeerConnection and inspecting the ICE candidates.
+ * Fetches the LAN IPv4 addresses exposed by the local HTTPS server.
+ * GitHub Pages does not provide this endpoint, so the fallback explains
+ * that the installed PWA does not need a host IP address.
  */
 export const getLocalIP = async (): Promise<string> => {
-  return new Promise((resolve) => {
-    const pc = new RTCPeerConnection({ 
-      iceServers: [
-        { urls: ['stun:stun.l.google.com:19302'] },
-        { urls: ['stun:stun1.l.google.com:19302'] }
-      ]
+  const pwaFallback = 'Not needed: both devices use the installed app';
+
+  try {
+    const response = await fetch('/api/ip', {
+      headers: { Accept: 'application/json' }
     });
-    pc.createDataChannel('');
-    
-    let ipFound = false;
-    
-    // Create a timeout to resolve if we can't find it quickly
-    const timeout = setTimeout(() => {
-        pc.close();
-        resolve('Unknown');
-    }, 3000);
 
-    pc.onicecandidate = (e) => {
-      if (!e.candidate) return;
-      if (ipFound) return;
-      
-      // Basic regex to find IPv4 pattern in the candidate string
-      const ipRegex = /([0-9]{1,3}(\.[0-9]{1,3}){3})/;
-      const match = e.candidate.candidate.match(ipRegex);
-      
-      if (match && match[1]) {
-        // Filter out localhost and 0.0.0.0
-        if (match[1] !== '127.0.0.1' && match[1] !== '0.0.0.0') {
-          ipFound = true;
-          clearTimeout(timeout);
-          pc.close();
-          resolve(match[1]);
-        }
-      }
-    };
+    if (!response.ok) return pwaFallback;
 
-    pc.createOffer()
-      .then((sdp) => pc.setLocalDescription(sdp))
-      .catch((err) => {
-         console.error("Error creating offer:", err);
-         clearTimeout(timeout);
-         pc.close();
-         resolve('Unknown');
-      });
-  });
+    const payload: unknown = await response.json();
+    if (!payload || typeof payload !== 'object' || !('addresses' in payload)) {
+      return pwaFallback;
+    }
+
+    const addresses = (payload as { addresses?: unknown }).addresses;
+    if (!Array.isArray(addresses)) return pwaFallback;
+
+    const validAddresses = addresses.filter(
+      (address): address is string => typeof address === 'string' && address.length > 0
+    );
+
+    return validAddresses.length > 0
+      ? validAddresses.join(', ')
+      : 'No non-internal IPv4 address found';
+  } catch {
+    return pwaFallback;
+  }
 };
 
 /**
@@ -75,9 +58,10 @@ export const formatSDPForQR = (data: any): string => {
     const lines = sdp.sdp.split('\n');
     const compressedLines: string[] = [];
     let mediaIndex = -1;
+    const mediaCodecs: {[key: number]: string[]} = {};
     const keptCandidateForMedia: {[key: number]: boolean} = {};
     const keptAnyCandidateForMedia: {[key: number]: boolean} = {};
-    
+
     const isPrivateIp = (ip: string) => {
       if (ip.startsWith('10.')) return true;
       if (ip.startsWith('192.168.')) return true;
@@ -90,9 +74,14 @@ export const formatSDPForQR = (data: any): string => {
       const trimmed = line.trim();
       if (!trimmed) continue;
       
-      // Track media sections
+      // Track media sections and extract codecs
       if (line.startsWith('m=')) {
         mediaIndex++;
+        // Extract codec numbers from m= line (e.g., "m=audio 40446 UDP/TLS/RTP/SAVPF 111 63 9...")
+        const parts = line.split(' ');
+        if (parts.length > 3) {
+          mediaCodecs[mediaIndex] = parts.slice(3); // codecs are everything after port and protocol
+        }
         compressedLines.push(line);
         continue;
       }

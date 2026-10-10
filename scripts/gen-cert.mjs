@@ -25,13 +25,17 @@ function detectOpenSsl() {
   return null;
 }
 
+function isIpv4Address(entry) {
+  return entry?.family === 'IPv4' || entry?.family === 4;
+}
+
 function getLanIpv4Addresses() {
   const interfaces = os.networkInterfaces();
   const addresses = new Set(['127.0.0.1']);
 
   for (const entries of Object.values(interfaces)) {
     for (const entry of entries ?? []) {
-      if (entry.family === 'IPv4' && !entry.internal) {
+      if (isIpv4Address(entry) && !entry.internal && entry.address) {
         addresses.add(entry.address);
       }
     }
