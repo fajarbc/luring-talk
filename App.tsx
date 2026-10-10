@@ -11,6 +11,9 @@ import {
 } from './utils/compact-signaling';
 
 const ICE_GATHERING_TIMEOUT = 10000;
+const DISCONNECT_GRACE_PERIOD = 5000;
+const RECOVERY_TIMEOUT = 20000;
+const MAX_ICE_RESTART_ATTEMPTS = 1;
 const DEBUG_MODE = import.meta.env.VITE_DEBUG_MODE === 'true';
 
 type ConnectionRole = 'offerer' | 'answerer';
@@ -42,6 +45,7 @@ function App() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   const pc = useRef<RTCPeerConnection | null>(null);
   const dataChannel = useRef<RTCDataChannel | null>(null);
@@ -54,6 +58,11 @@ function App() {
   const makingOffer = useRef(false);
   const ignoreOffer = useRef(false);
   const isSettingRemoteAnswerPending = useRef(false);
+  const disconnectTimer = useRef<number | null>(null);
+  const recoveryTimeout = useRef<number | null>(null);
+  const recoveryStartedAt = useRef<number | null>(null);
+  const iceRestartAttempts = useRef(0);
+  const userEndedCall = useRef(false);
   const iceGatheringWaitCleanup = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -96,6 +105,77 @@ function App() {
   const appendDebug = useCallback((message: string) => {
     setDebugInfo((previous) => previous ? `${previous}\n${message}` : message);
   }, []);
+
+  const clearRecoveryTimers = useCallback((): boolean => {
+    const wasRecovering = recoveryStartedAt.current !== null;
+    if (disconnectTimer.current !== null) {
+      window.clearTimeout(disconnectTimer.current);
+      disconnectTimer.current = null;
+    }
+    if (recoveryTimeout.current !== null) {
+      window.clearTimeout(recoveryTimeout.current);
+      recoveryTimeout.current = null;
+    }
+    recoveryStartedAt.current = null;
+    iceRestartAttempts.current = 0;
+    setIsReconnecting(false);
+    return wasRecovering;
+  }, []);
+
+  const requestIceRestart = useCallback((peer: RTCPeerConnection) => {
+    if (
+      userEndedCall.current ||
+      pc.current !== peer ||
+      iceRestartAttempts.current >= MAX_ICE_RESTART_ATTEMPTS
+    ) {
+      return;
+    }
+
+    iceRestartAttempts.current += 1;
+    appendDebug(`🔁 Restarting ICE (attempt ${iceRestartAttempts.current}/${MAX_ICE_RESTART_ATTEMPTS})`);
+    try {
+      peer.restartIce();
+    } catch (restartError) {
+      console.error('ICE restart failed:', restartError);
+      clearRecoveryTimers();
+      setError(`Connection recovery failed: ${(restartError as Error).message}`);
+    }
+  }, [appendDebug, clearRecoveryTimers]);
+
+  const armConnectionRecovery = useCallback((peer: RTCPeerConnection, restartImmediately = false) => {
+    if (userEndedCall.current || pc.current !== peer) return;
+
+    if (recoveryStartedAt.current === null) {
+      recoveryStartedAt.current = Date.now();
+      appendDebug('⚠️ Connection interrupted; allowing a short recovery window');
+    }
+    setIsReconnecting(true);
+
+    if (recoveryTimeout.current === null) {
+      recoveryTimeout.current = window.setTimeout(() => {
+        recoveryTimeout.current = null;
+        if (userEndedCall.current || pc.current !== peer || peer.connectionState === 'connected') return;
+        clearRecoveryTimers();
+        setError('Connection failed after 20 seconds of recovery attempts. Please retry the call.');
+      }, RECOVERY_TIMEOUT);
+    }
+
+    if (restartImmediately) {
+      if (disconnectTimer.current !== null) {
+        window.clearTimeout(disconnectTimer.current);
+        disconnectTimer.current = null;
+      }
+      requestIceRestart(peer);
+      return;
+    }
+
+    if (disconnectTimer.current !== null || iceRestartAttempts.current >= MAX_ICE_RESTART_ATTEMPTS) return;
+    disconnectTimer.current = window.setTimeout(() => {
+      disconnectTimer.current = null;
+      if (userEndedCall.current || pc.current !== peer || peer.connectionState === 'connected') return;
+      requestIceRestart(peer);
+    }, DISCONNECT_GRACE_PERIOD);
+  }, [appendDebug, clearRecoveryTimers, requestIceRestart]);
 
   const captureLocalMedia = useCallback(async (): Promise<MediaStream | null> => {
     const audio = {
@@ -251,6 +331,8 @@ function App() {
   }, [appendDebug, handleDataChannelMessage, startMediaAndRenegotiate]);
 
   const initializePeerConnection = useCallback(async (connectionRole: ConnectionRole) => {
+    userEndedCall.current = false;
+    clearRecoveryTimers();
     const peer = new RTCPeerConnection({
       iceServers: [],
       iceTransportPolicy: 'all',
@@ -296,9 +378,28 @@ function App() {
     };
 
     peer.onconnectionstatechange = () => {
-      appendDebug(`🔗 Connection: ${peer.connectionState}`);
-      if (peer.connectionState === 'failed') {
-        setError('Connection failed. Please retry the call.');
+      const connectionState = peer.connectionState;
+      appendDebug(`🔗 Connection: ${connectionState}`);
+      if (connectionState === 'connected') {
+        const wasRecovering = clearRecoveryTimers();
+        if (wasRecovering && !userEndedCall.current) {
+          setWarning('Connection restored.');
+        }
+        return;
+      }
+      if (connectionState === 'disconnected') {
+        armConnectionRecovery(peer);
+        return;
+      }
+      if (connectionState === 'failed') {
+        if (iceRestartAttempts.current < MAX_ICE_RESTART_ATTEMPTS) {
+          armConnectionRecovery(peer, true);
+          return;
+        }
+        if (!userEndedCall.current && pc.current === peer) {
+          clearRecoveryTimers();
+          setError('Connection failed after retrying ICE. Please retry the call.');
+        }
       }
     };
 
@@ -312,7 +413,7 @@ function App() {
 
     pc.current = peer;
     return peer;
-  }, [appendDebug, sendDataChannelMessage, sendLocalDescription, setupDataChannel]);
+  }, [appendDebug, armConnectionRecovery, clearRecoveryTimers, sendDataChannelMessage, sendLocalDescription, setupDataChannel]);
 
   const waitForIceGathering = (peer: RTCPeerConnection) => new Promise<boolean>((resolve) => {
     let settled = false;
@@ -370,6 +471,8 @@ function App() {
 
   const endCall = () => {
     iceGatheringWaitCleanup.current?.();
+    userEndedCall.current = true;
+    clearRecoveryTimers();
     localStream.current?.getTracks().forEach((track) => track.stop());
     localStream.current = null;
     dataChannel.current?.close();
@@ -584,6 +687,12 @@ function App() {
           onEndCall={endCall}
           onSwitchCamera={switchCamera}
         />
+        {isReconnecting && (
+          <div role="status" aria-live="polite" className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-yellow-500/90 text-black px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2">
+            <span className="material-symbols-outlined animate-spin text-sm">sync</span>
+            Reconnecting…
+          </div>
+        )}
         {warning && (
           <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-yellow-500/90 text-black px-6 py-3 rounded-full font-bold shadow-lg">
             {warning}
