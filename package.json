@@ -12,6 +12,7 @@
     "verify:offline-tailwind": "node scripts/verify-offline-tailwind.mjs",
     "verify:pwa-icons": "node scripts/verify-pwa-icons.mjs",
     "preview": "vite preview",
+    "test": "vitest run",
     "cert": "node scripts/gen-cert.mjs",
     "start": "node server.js"
   },
