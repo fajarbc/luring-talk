@@ -4,6 +4,7 @@ import {
   compactHandshakeFromSdp,
   decodeCompactHandshake,
   encodeCompactHandshake,
+  getPrivateIpv4Subnet,
   selectHostCandidates,
   type CompactHandshake,
 } from './compact-signaling';
@@ -34,6 +35,13 @@ describe('compact signaling', () => {
     expect(decodeCompactHandshake(encoded)).toEqual(handshake);
   });
 
+  it('derives a /24 subnet only from private IPv4 addresses', () => {
+    expect(getPrivateIpv4Subnet('192.168.44.12')).toBe('192.168.44');
+    expect(getPrivateIpv4Subnet('10.8.0.2')).toBe('10.8.0');
+    expect(getPrivateIpv4Subnet('fajarbc.github.io')).toBeUndefined();
+    expect(getPrivateIpv4Subnet('192.168.999.12')).toBeUndefined();
+  });
+
   it('selects three unique host candidates in LAN-first order', () => {
     const candidates = selectHostCandidates([
       'a=candidate:1 1 UDP 2130706431 10.0.0.4 5001 typ host',
@@ -49,6 +57,54 @@ describe('compact signaling', () => {
       { address: '192.168.1.20', port: 5002 },
       { address: '192.168.1.21', port: 5003 },
       { address: '10.0.0.4', port: 5001 },
+    ]);
+  });
+
+  it('limits the candidate list without replacing the first port for a duplicate address', () => {
+    expect(selectHostCandidates([
+      'a=candidate:1 1 UDP 2130706431 10.0.0.4 5001 typ host',
+      'a=candidate:2 1 UDP 2130706430 192.168.1.20 5002 typ host',
+      'a=candidate:3 1 UDP 2122260229 192.168.1.20 5003 typ host',
+      'a=candidate:4 1 UDP 2122260228 172.20.0.2 5004 typ host',
+    ], undefined, 2)).toEqual([
+      { address: '10.0.0.4', port: 5001 },
+      { address: '192.168.1.20', port: 5002 },
+    ]);
+  });
+
+  it('keeps the detected LAN candidate ahead of Docker and VPN interfaces in the compact handshake', () => {
+    const sdp = [
+      'v=0',
+      'a=ice-ufrag:offerUfrag',
+      'a=ice-pwd:offerPassword',
+      `a=fingerprint:sha-256 ${fingerprintHex}`,
+      'a=candidate:1 1 UDP 2130706431 172.20.0.2 5001 typ host',
+      'a=candidate:2 1 UDP 2130706430 10.8.0.2 5002 typ host',
+      'a=candidate:3 1 UDP 2122260223 192.168.44.12 5003 typ host',
+      'a=candidate:4 1 UDP 2122260222 192.168.44.12 5004 typ host',
+      'a=candidate:5 1 UDP 2122260221 192.168.44.13 5005 typ host',
+    ].join('\r\n');
+
+    expect(decodeCompactHandshake(compactHandshakeFromSdp('offer', sdp, getPrivateIpv4Subnet('192.168.44.1'))).candidates).toEqual([
+      { address: '192.168.44.12', port: 5003 },
+      { address: '192.168.44.13', port: 5005 },
+      { address: '172.20.0.2', port: 5001 },
+    ]);
+  });
+
+  it('uses valid mDNS candidates only after filtering unusable host lines', () => {
+    const candidates = selectHostCandidates([
+      'a=candidate:1 1 UDP 2130706431 127.0.0.1 5001 typ host',
+      'a=candidate:2 1 UDP 2130706430 8.8.8.8 5002 typ host',
+      'a=candidate:3 1 UDP 2122260223 192.168.1.20 5003 typ srflx raddr 192.168.1.21 rport 5003',
+      'a=candidate:4 1 TCP 2122260222 192.168.1.21 5004 typ host',
+      'a=candidate:5 1 UDP 2122260221 phone.local 5005 typ host',
+      'a=candidate:6 1 UDP 2122260220 tablet.local 5006 typ host',
+    ]);
+
+    expect(candidates).toEqual([
+      { address: 'phone.local', port: 5005 },
+      { address: 'tablet.local', port: 5006 },
     ]);
   });
 
@@ -86,7 +142,7 @@ describe('compact signaling', () => {
     expect(answerSdp).toContain('a=setup:active');
   });
 
-  it('rejects malformed fingerprints and duplicate candidate addresses', () => {
+  it('rejects malformed fingerprints, duplicate candidate addresses, and invalid ports', () => {
     expect(() => decodeCompactHandshake('v1|o|ufrag|pwd|not-base64|192.168.1.20:5001')).toThrow(
       'Compact handshake fingerprint',
     );
@@ -94,5 +150,9 @@ describe('compact signaling', () => {
     expect(() => decodeCompactHandshake(
       `v1|o|ufrag|pwd|${fingerprint}|192.168.1.20:5001,192.168.1.20:5002`,
     )).toThrow('candidates must be unique');
+
+    expect(() => decodeCompactHandshake(
+      `v1|o|ufrag|pwd|${fingerprint}|192.168.1.20:0`,
+    )).toThrow('invalid host candidate');
   });
 });
