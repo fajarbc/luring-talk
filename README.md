@@ -1,4 +1,4 @@
-# LuringTalk Call - P2P Offline Video Chat
+# LuringTalk - P2P Offline Video Call
 
 **LuringTalk** is a Progressive Web App (PWA) designed for voice and video calling between two devices on the same local Wi-Fi network (Hotspot or Router). It uses WebRTC for peer-to-peer communication and requires **NO Internet connection**.
 
