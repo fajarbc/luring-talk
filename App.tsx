@@ -756,7 +756,7 @@ function App() {
       <header className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 glass-panel border-b-0 border-white/5">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-neon-cyan">
-            <span className="material-symbols-outlined text-[18px] text-white">leak_add</span>
+            <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" className="w-7 h-7 object-contain" />
           </div>
           <div>
             <h1 className="text-lg font-bold leading-none tracking-wide text-white">LuringTalk</h1>
