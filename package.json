@@ -1,5 +1,5 @@
 {
-  "name": "luring-talk-call",
+  "name": "luring-talk",
   "version": "1.0.0",
   "description": "Luring Talk is a P2P offline video call PWA",
   "type": "module",
@@ -30,6 +30,7 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/vite": "^4.1.13",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.6",
