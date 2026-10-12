@@ -1,10 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#0a0a0a"/>
-  <circle cx="256" cy="256" r="180" fill="none" stroke="#00f0ff" stroke-width="20" />
-  <circle cx="256" cy="256" r="140" fill="none" stroke="#ff0099" stroke-width="15" opacity="0.8" />
-  <path d="M256 160 L256 352 M160 256 L352 256" stroke="#39ff14" stroke-width="20" stroke-linecap="round" />
-  <circle cx="256" cy="256" r="200" fill="none" stroke="#00f0ff" stroke-width="4" opacity="0.3">
-    <animate attributeName="r" from="200" to="220" dur="2s" repeatCount="indefinite" />
-    <animate attributeName="opacity" from="0.3" to="0" dur="2s" repeatCount="indefinite" />
-  </circle>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+  <title id="title">Luring Talk animated icon</title>
+  <desc id="desc">Two lively overlapping speech bubbles with bouncing conversation dots and a visible warm signal ripple, for offline communication.</desc>
+  <style>
+    .ripple { transform-box: fill-box; transform-origin: center; animation: ripple 2.15s ease-out infinite; }
+    .ripple.r2 { animation-delay: 1.07s; }
+    .bubble-a { transform-box: fill-box; transform-origin: center; animation: bob-a 1.55s ease-in-out infinite; }
+    .bubble-b { transform-box: fill-box; transform-origin: center; animation: bob-b 1.55s ease-in-out infinite; }
+    .dot-a { animation: talk-a .78s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+    .dot-b { animation: talk-b .78s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+    .dot-c { animation: talk-c .78s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+    .signal { stroke-dasharray: 2 8; animation: signal 1.2s linear infinite; }
+    .spark { animation: spark 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+    @keyframes ripple { 0% { transform: scale(.58); opacity: .72; } 75%,100% { transform: scale(1.22); opacity: 0; } }
+    @keyframes bob-a { 0%,100% { transform: translateY(1px) rotate(-1deg); } 50% { transform: translateY(-5px) rotate(1deg); } }
+    @keyframes bob-b { 0%,100% { transform: translateY(-1px) rotate(1deg); } 50% { transform: translateY(5px) rotate(-1deg); } }
+    @keyframes talk-a { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.08); } }
+    @keyframes talk-b { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.08); } }
+    @keyframes talk-c { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.08); } }
+    @keyframes signal { to { stroke-dashoffset: -20; } }
+    @keyframes spark { 0%,100% { opacity: .55; transform: scale(.78) rotate(-8deg); } 50% { opacity: 1; transform: scale(1.18) rotate(8deg); } }
+    .dot-a { animation-delay: 0s; } .dot-b { animation-delay: .16s; } .dot-c { animation-delay: .32s; }
+    @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+  </style>
+  <!-- Expanding rings turn the offline hand-off into a clear, lively signature. -->
+  <g fill="none" stroke="#F2B957" stroke-width="3.5" aria-hidden="true">
+    <circle class="ripple" cx="124" cy="120" r="64"/>
+    <circle class="ripple r2" cx="124" cy="120" r="64"/>
+  </g>
+  <g aria-hidden="true">
+    <g class="bubble-a">
+      <path d="M48 72c0-15.5 12.5-28 28-28h49c15.5 0 28 12.5 28 28v31c0 15.5-12.5 28-28 28H94l-27 19 7-20c-15-1.8-26-14.2-26-29z" fill="#174B48"/>
+      <circle class="dot-a" cx="88" cy="88" r="5.7" fill="#E8F4E9"/>
+      <circle class="dot-b" cx="106" cy="88" r="5.7" fill="#E8F4E9"/>
+      <circle class="dot-c" cx="124" cy="88" r="5.7" fill="#E8F4E9"/>
+    </g>
+    <g class="bubble-b">
+      <path d="M105 128c0-14.4 11.6-26 26-26h42c14.4 0 26 11.6 26 26v29c0 14.4-11.6 26-26 26h-29l-21 15 5-16c-13-1.5-23-12.5-23-26z" fill="#E77A59" stroke="#F8F5EA" stroke-width="4" stroke-linejoin="round"/>
+      <circle cx="143" cy="143" r="4.8" fill="#FFF7E8"/><circle cx="160" cy="143" r="4.8" fill="#FFF7E8"/><circle cx="177" cy="143" r="4.8" fill="#FFF7E8"/>
+    </g>
+    <path class="signal" d="M130 103c10 3 18 10 23 20" fill="none" stroke="#F2B957" stroke-width="4" stroke-linecap="round"/>
+    <circle class="spark" cx="153" cy="123" r="4.5" fill="#F2B957"/>
+    <path class="spark" d="M201 67l2.4 6.3 6.3 2.4-6.3 2.4-2.4 6.3-2.4-6.3-6.3-2.4 6.3-2.4z" fill="#E77A59"/>
+  </g>
 </svg>

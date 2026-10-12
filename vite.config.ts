@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
           'icon-512-maskable.png',
         ],
         manifest: {
-          name: 'LuringTalk Call',
+          name: 'LuringTalk',
           short_name: 'LuringTalk',
           description: 'Offline peer-to-peer video calling over a local Wi-Fi network.',
           start_url: './',
