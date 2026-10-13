@@ -9,6 +9,7 @@ import {
   decodeCompactHandshake,
   CompactHandshake,
 } from './utils/compact-signaling';
+import { getLocalIP } from './utils/network';
 
 const ICE_GATHERING_TIMEOUT = 10000;
 const DISCONNECT_GRACE_PERIOD = 5000;
@@ -34,7 +35,7 @@ const normalizeDescription = (handshake: CompactHandshake): RTCSessionDescriptio
 
 function App() {
   const [appState, setAppState] = useState<AppState>(AppState.HOME);
-  const [localIP] = useState('LAN candidates from this device');
+  const [localIP, setLocalIP] = useState('Detecting LAN addresses…');
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [signalString, setSignalString] = useState('');
   const [manualInputVal, setManualInputVal] = useState('');
@@ -72,6 +73,17 @@ function App() {
       bgVideoRef.current.srcObject = localStream.current;
     }
   }, [appState, facingMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getLocalIP().then((address) => {
+      if (!cancelled) setLocalIP(address);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!warning) return;
