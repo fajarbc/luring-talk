@@ -209,6 +209,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, instruction }) =
         {torchSupported && (
           <button
             onClick={() => setTorchOn(!torchOn)}
+            aria-label={torchOn ? 'Turn flashlight off' : 'Turn flashlight on'}
             className="bg-black/40 backdrop-blur-md border border-white/10 text-white p-3 rounded-full hover:bg-white/10 transition-colors"
           >
             <span className="material-symbols-outlined">{torchOn ? 'flash_on' : 'flash_off'}</span>
@@ -216,19 +217,22 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, instruction }) =
         )}
         <button
           onClick={() => setFacingMode(facingMode === 'environment' ? 'user' : 'environment')}
+          aria-label="Switch camera"
           className="bg-black/40 backdrop-blur-md border border-white/10 text-white p-3 rounded-full hover:bg-white/10 transition-colors"
         >
           <span className="material-symbols-outlined">flip_camera_android</span>
         </button>
         <button
           onClick={() => setRestartCounter((v) => v + 1)}
+          aria-label="Restart camera"
           className="bg-black/40 backdrop-blur-md border border-white/10 text-white p-3 rounded-full hover:bg-white/10 transition-colors"
           title="Restart camera"
         >
           <span className="material-symbols-outlined">restart_alt</span>
         </button>
-        <button 
+        <button
           onClick={onClose}
+          aria-label="Close scanner"
           className="bg-black/40 backdrop-blur-md border border-white/10 text-white p-3 rounded-full hover:bg-white/10 transition-colors"
         >
           <span className="material-symbols-outlined">close</span>
@@ -243,9 +247,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, instruction }) =
           </div>
         ) : (
           <>
-            <video 
-              ref={videoRef} 
-              className="absolute inset-0 w-full h-full object-cover opacity-70" 
+            <video
+              ref={videoRef}
+              aria-label="Camera viewfinder"
+              className="absolute inset-0 w-full h-full object-cover opacity-70"
               playsInline 
               muted
               autoPlay
@@ -289,7 +294,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, instruction }) =
           <div className="flex items-center gap-2">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-2 rounded-lg"
+              className="min-h-11 bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-2 rounded-lg"
             >
               Upload QR Image
             </button>
@@ -297,6 +302,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, instruction }) =
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              aria-label="Upload QR code image"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];

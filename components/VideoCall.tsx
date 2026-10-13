@@ -173,8 +173,9 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
     >
       {/* Remote Video (Fullscreen Background) */}
       <div className="absolute inset-0 z-0 bg-black">
-        <video 
+        <video
           ref={remoteVideoRef}
+          aria-label="Remote video"
           autoPlay 
           playsInline 
           onError={handleRemoteVideoError}
@@ -200,13 +201,14 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
         onPointerCancel={handleLocalPointerUp}
         onClick={(e) => e.stopPropagation()}
         style={{ left: `${localPos.x}px`, top: `${localPos.y}px` }}
-        className={`absolute z-20 w-[25%] min-w-[100px] max-w-[180px] aspect-[3/4] transition-all duration-300 touch-none ${
+        className={`absolute z-20 w-[25%] min-w-[100px] max-w-[180px] aspect-[3/4] transition-[opacity,transform] duration-300 touch-none ${
           uiVisible ? 'opacity-100 translate-y-0' : 'opacity-50 -translate-y-4'
         } ${isDraggingLocal ? 'cursor-grabbing' : 'cursor-grab'}`}
       >
         <div className="w-full h-full rounded-2xl overflow-hidden shadow-neon-cyan border border-primary/30 bg-black relative group">
-          <video 
+          <video
             ref={localVideoRef}
+            aria-label="Your camera preview"
             autoPlay 
             playsInline 
             muted 
@@ -224,7 +226,7 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
       </div>
 
       {/* Timer (Top Right) */}
-      <div className={`absolute top-6 right-6 z-20 transition-all duration-300 ${uiVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+      <div className={`absolute top-6 right-6 z-20 transition-[opacity,transform] duration-300 ${uiVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
         <div className="glass-panel px-4 py-2 rounded-full border border-white/10 shadow-lg flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
             <span className="font-mono text-sm font-bold text-white tracking-wider tabular-nums">
@@ -237,9 +239,10 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
       <div className={`absolute bottom-0 left-0 right-0 p-6 pb-8 bg-gradient-to-t from-black via-black/90 to-transparent transition-transform duration-300 flex justify-center items-center gap-4 sm:gap-6 z-30 ${uiVisible ? 'translate-y-0' : 'translate-y-full'}`}>
         
         {/* Toggle Audio */}
-        <button 
+        <button
           onClick={(e) => { e.stopPropagation(); toggleAudio(); }}
-          className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center backdrop-blur-md border transition-all active:scale-95 shadow-lg ${
+          aria-label={isAudioMuted ? 'Unmute microphone' : 'Mute microphone'}
+          className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center backdrop-blur-md border transition-[color,background-color,border-color,box-shadow,transform] active:scale-95 shadow-lg ${
             isAudioMuted 
               ? 'bg-red-500/20 text-red-500 border-red-500/50' 
               : 'bg-white/10 text-white border-white/20 hover:bg-white/20 hover:shadow-neon-cyan'
@@ -251,9 +254,10 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
         </button>
 
         {/* Toggle Video */}
-        <button 
+        <button
           onClick={(e) => { e.stopPropagation(); toggleVideo(); }}
-          className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center backdrop-blur-md border transition-all active:scale-95 shadow-lg ${
+          aria-label={isVideoMuted ? 'Turn camera on' : 'Turn camera off'}
+          className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center backdrop-blur-md border transition-[color,background-color,border-color,box-shadow,transform] active:scale-95 shadow-lg ${
             isVideoMuted 
               ? 'bg-red-500/20 text-red-500 border-red-500/50' 
               : 'bg-white/10 text-white border-white/20 hover:bg-white/20 hover:shadow-neon-cyan'
@@ -265,9 +269,10 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
         </button>
 
         {/* Switch Camera */}
-        <button 
+        <button
           onClick={(e) => { e.stopPropagation(); onSwitchCamera(); }}
-          className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center backdrop-blur-md border border-white/20 bg-white/10 text-white transition-all active:scale-95 shadow-lg hover:bg-white/20 hover:shadow-neon-green"
+          aria-label="Switch camera"
+          className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center backdrop-blur-md border border-white/20 bg-white/10 text-white transition-[color,background-color,border-color,box-shadow,transform] active:scale-95 shadow-lg hover:bg-white/20 hover:shadow-neon-green"
         >
           <span className="material-symbols-outlined text-2xl">
             cameraswitch
@@ -275,9 +280,10 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
         </button>
 
         {/* End Call */}
-        <button 
+        <button
           onClick={(e) => { e.stopPropagation(); onEndCall(); }}
-          className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-red-600 text-white flex items-center justify-center shadow-neon-pink hover:bg-red-500 active:scale-90 transition-all border-4 border-red-500/20"
+          aria-label="End call"
+          className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-red-600 text-white flex items-center justify-center shadow-neon-pink hover:bg-red-500 active:scale-90 transition-[color,background-color,border-color,box-shadow,transform] border-4 border-red-500/20"
         >
           <span className="material-symbols-outlined text-3xl sm:text-4xl">call_end</span>
         </button>

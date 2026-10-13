@@ -722,12 +722,12 @@ function App() {
         />
         {isReconnecting && (
           <div role="status" aria-live="polite" className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-yellow-500/90 text-black px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2">
-            <span className="material-symbols-outlined animate-spin text-sm">sync</span>
+            <span className="material-symbols-outlined animate-spin text-sm" aria-hidden="true">sync</span>
             Reconnecting…
           </div>
         )}
         {warning && (
-          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-yellow-500/90 text-black px-6 py-3 rounded-full font-bold shadow-lg">
+          <div role="status" aria-live="polite" className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-yellow-500/90 text-black px-6 py-3 rounded-full font-bold shadow-lg">
             {warning}
           </div>
         )}
@@ -741,7 +741,7 @@ function App() {
   return (
     <div className="min-h-screen bg-background text-white font-sans overflow-hidden flex flex-col selection:bg-primary/30 relative">
       {warning && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-yellow-500/90 text-black px-6 py-3 rounded-full font-bold shadow-lg text-sm whitespace-nowrap">
+        <div role="status" aria-live="polite" className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] max-w-[calc(100%-3rem)] bg-yellow-500/90 text-black px-6 py-3 rounded-full font-bold shadow-lg text-sm text-center">
           {warning}
         </div>
       )}
@@ -763,7 +763,7 @@ function App() {
             <span className="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">P2P Secure</span>
           </div>
         </div>
-        {isSetup && <button onClick={endCall} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"><span className="material-symbols-outlined text-sm">close</span></button>}
+        {isSetup && <button onClick={endCall} aria-label="Close setup" className="w-11 h-11 -m-1.5 rounded-full bg-white/10 flex items-center justify-center"><span className="material-symbols-outlined text-sm" aria-hidden="true">close</span></button>}
       </header>
 
       <main className="flex-1 flex flex-col w-full max-w-md mx-auto p-6 gap-6 z-10 relative">
@@ -776,18 +776,18 @@ function App() {
                     <p className="text-sm font-bold text-white">Install LuringTalk</p>
                     <p className="text-xs text-gray-400">Add to Home Screen for offline access.</p>
                   </div>
-                  <button onClick={handleInstallApp} className="bg-primary text-black font-bold px-4 py-2 rounded-lg">Install</button>
+                  <button onClick={handleInstallApp} className="min-h-11 bg-primary text-black font-bold px-4 py-2 rounded-lg">Install</button>
                 </div>
               </div>
             )}
             <div className="relative mb-12 flex flex-col items-center justify-center">
-              <div className="absolute w-64 h-64 rounded-full border border-primary/20 animate-[spin_10s_linear_infinite]" />
-              <div className="absolute w-48 h-48 rounded-full border border-secondary/20 animate-[spin_7s_linear_infinite_reverse]" />
+              <div aria-hidden="true" className="absolute w-64 h-64 rounded-full border border-primary/20 animate-[spin_10s_linear_infinite]" />
+              <div aria-hidden="true" className="absolute w-48 h-48 rounded-full border border-secondary/20 animate-[spin_7s_linear_infinite_reverse]" />
               <div className="w-32 h-32 rounded-full bg-surface border border-white/10 shadow-neon-cyan flex items-center justify-center relative z-10 glass-panel">
-                <span className="material-symbols-outlined text-5xl text-primary animate-pulse">wifi_tethering</span>
+                <span className="material-symbols-outlined text-5xl text-primary animate-pulse" aria-hidden="true">wifi_tethering</span>
               </div>
               <div className="mt-8 text-center">
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Signaling mode</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Signaling mode</p>
                 <div className="inline-block px-6 py-2 rounded-full bg-white/5 border border-white/10 font-mono text-sm text-primary shadow-neon-cyan">{localIP}</div>
               </div>
             </div>
@@ -799,13 +799,13 @@ function App() {
                 <div className="h-full w-full rounded-2xl bg-black/50 backdrop-blur-sm flex items-center justify-center gap-3"><span className="material-symbols-outlined text-secondary">qr_code_scanner</span><span className="text-lg font-bold tracking-wider">JOIN CALL</span></div>
               </button>
             </div>
-            <p className="text-center text-[10px] text-gray-600 uppercase tracking-widest">Wi-Fi LAN Only • No Internet Needed</p>
+            <p className="text-center text-xs text-gray-400 uppercase tracking-widest">Wi-Fi LAN Only • No Internet Needed</p>
           </div>
         )}
 
         {(appState === AppState.GENERATING_OFFER || appState === AppState.GENERATING_ANSWER) && (
-          <div className="flex flex-col items-center justify-center flex-1">
-            <div className="w-20 h-20 border-4 border-white/10 border-t-primary rounded-full animate-spin mb-8" />
+          <div role="status" aria-live="polite" className="flex flex-col items-center justify-center flex-1">
+            <div aria-hidden="true" className="w-20 h-20 border-4 border-white/10 border-t-primary rounded-full animate-spin mb-8" />
             <h2 className="text-xl font-bold text-white tracking-wide animate-pulse">Establishing Link…</h2>
             <p className="text-sm text-gray-400 mt-2">Preparing the data-channel handshake</p>
           </div>
@@ -819,8 +819,8 @@ function App() {
               </div>
               <div className="bg-white p-2 rounded-xl mb-6 mt-2"><img src={qrCodeData} alt="Compact signaling QR" className="w-64 h-64 object-contain" /></div>
               <div className="w-full flex flex-col gap-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Or copy code manually</label>
-                <div className="flex gap-2"><input type="text" readOnly value={signalString} className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-gray-300 truncate" /><button onClick={() => navigator.clipboard.writeText(signalString).then(() => setWarning('Code copied to clipboard.'))} className="bg-white/10 rounded-lg px-3 py-2"><span className="material-symbols-outlined text-sm">content_copy</span></button></div>
+                <label htmlFor="compact-signal-code" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Or copy code manually</label>
+                <div className="flex gap-2"><input id="compact-signal-code" type="text" readOnly value={signalString} className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-gray-300 truncate" /><button onClick={() => navigator.clipboard.writeText(signalString).then(() => setWarning('Code copied to clipboard.'))} aria-label="Copy code to clipboard" className="min-w-11 min-h-11 bg-white/10 rounded-lg px-3 py-2"><span className="material-symbols-outlined text-sm" aria-hidden="true">content_copy</span></button></div>
                 <p className="text-[10px] text-center text-primary">{signalString.length} characters</p>
               </div>
             </div>
@@ -840,8 +840,8 @@ function App() {
             {DEBUG_MODE && <div className="absolute top-20 left-4 right-4 z-[65] bg-black/90 border border-primary/50 rounded-lg p-4 font-mono text-xs text-primary whitespace-pre-wrap max-h-40 overflow-y-auto">{debugInfo || 'Waiting for QR code scan…'}</div>}
             <div className="absolute bottom-8 left-6 right-6 z-[60]">
               <div className="glass-panel p-4 rounded-2xl flex flex-col gap-3 shadow-neon-pink border border-secondary/20 bg-black/80">
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Or paste compact code</label>
-                <input type="text" placeholder="v1|o/a|ufrag|pwd|fingerprint|ip:port" value={manualInputVal} onChange={(event) => setManualInputVal(event.target.value)} onPaste={handleManualPaste} disabled={isProcessingManualInput} className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-3 text-sm text-white disabled:opacity-50" />
+                <label htmlFor="compact-signal-input" className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Or paste compact code</label>
+                <input id="compact-signal-input" type="text" placeholder="v1|o/a|ufrag|pwd|fingerprint|ip:port" value={manualInputVal} onChange={(event) => setManualInputVal(event.target.value)} onPaste={handleManualPaste} disabled={isProcessingManualInput} className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-3 text-sm text-white disabled:opacity-50" />
                 <div className="flex gap-2"><button onClick={handlePasteFromClipboard} disabled={isProcessingManualInput} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-lg disabled:opacity-50"><span className="material-symbols-outlined align-middle">content_paste</span> Paste</button><button onClick={() => handleManualInput()} disabled={isProcessingManualInput || !manualInputVal.trim()} className="flex-1 bg-secondary text-black font-bold py-3 rounded-lg disabled:opacity-50">{isProcessingManualInput ? 'Connecting…' : 'Connect'}</button></div>
               </div>
             </div>
