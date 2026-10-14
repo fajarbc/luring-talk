@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
           scope: './',
           display: 'standalone',
           background_color: '#050505',
-          theme_color: '#00d4ff',
+          theme_color: '#00f0ff',
           orientation: 'portrait',
           icons: [
             {
@@ -88,7 +88,7 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       },
     },
   };

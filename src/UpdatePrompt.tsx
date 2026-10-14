@@ -74,7 +74,7 @@ function UpdatePrompt() {
           type="button"
           onClick={applyUpdate}
           disabled={!updateServiceWorker}
-          className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-black disabled:opacity-50"
+          className="min-h-11 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-black disabled:opacity-50"
         >
           Reload
         </button>
@@ -83,7 +83,7 @@ function UpdatePrompt() {
         type="button"
         onClick={dismiss}
         aria-label="Dismiss offline status"
-        className="rounded-lg bg-white/10 px-3 py-2 text-sm font-bold text-white"
+        className="min-h-11 rounded-lg bg-white/10 px-3 py-2 text-sm font-bold text-white"
       >
         {needRefresh ? 'Later' : 'Dismiss'}
       </button>
