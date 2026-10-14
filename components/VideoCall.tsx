@@ -13,6 +13,7 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
   const localVideoWrapperRef = useRef<HTMLDivElement>(null);
   
   const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
   const [uiVisible, setUiVisible] = useState(true);
   const [duration, setDuration] = useState(0);
@@ -176,8 +177,9 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
         <video
           ref={remoteVideoRef}
           aria-label="Remote video"
-          autoPlay 
-          playsInline 
+          autoPlay
+          playsInline
+          muted={isSpeakerMuted}
           onError={handleRemoteVideoError}
           className={`w-full h-full object-cover transition-opacity duration-700 ease-in-out ${remoteStream ? 'opacity-100' : 'opacity-0'}`}
         />
@@ -250,6 +252,21 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
         >
           <span className="material-symbols-outlined text-2xl">
             {isAudioMuted ? 'mic_off' : 'mic'}
+          </span>
+        </button>
+
+        {/* Toggle Speaker */}
+        <button
+          onClick={(e) => { e.stopPropagation(); setIsSpeakerMuted((muted) => !muted); }}
+          aria-label={isSpeakerMuted ? 'Unmute speaker' : 'Mute speaker'}
+          className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center backdrop-blur-md border transition-[color,background-color,border-color,box-shadow,transform] active:scale-95 shadow-lg ${
+            isSpeakerMuted
+              ? 'bg-red-500/20 text-red-500 border-red-500/50'
+              : 'bg-white/10 text-white border-white/20 hover:bg-white/20 hover:shadow-neon-cyan'
+          }`}
+        >
+          <span className="material-symbols-outlined text-2xl">
+            {isSpeakerMuted ? 'volume_off' : 'volume_up'}
           </span>
         </button>
 
