@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { AppState } from './types';
-import QRScanner from './components/QRScanner';
 import VideoCall from './components/VideoCall';
 import ErrorScreen from './src/screens/ErrorScreen';
 import HomeScreen from './src/screens/HomeScreen';
+import ShowCodeScreen from './src/screens/ShowCodeScreen';
+import ScanScreen from './src/screens/ScanScreen';
 import {
   buildDataChannelSdp,
   compactHandshakeFromSdp,
@@ -788,40 +789,29 @@ function App() {
         )}
 
         {(appState === AppState.SHOWING_OFFER || appState === AppState.SHOWING_ANSWER) && qrCodeData && (
-          <div className="flex flex-col items-center flex-1">
-            <div className="w-full glass-panel rounded-3xl p-6 flex flex-col items-center shadow-2xl relative">
-              <div className="absolute -top-3 px-4 py-1 rounded-full bg-primary text-black text-xs font-bold uppercase tracking-wider shadow-neon-cyan">
-                {appState === AppState.SHOWING_OFFER ? 'Step 1: Scan Me' : 'Step 2: Show Host'}
-              </div>
-              <div className="bg-white p-2 rounded-xl mb-6 mt-2"><img src={qrCodeData} alt="Compact signaling QR" className="w-64 h-64 object-contain" /></div>
-              <div className="w-full flex flex-col gap-2">
-                <label htmlFor="compact-signal-code" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Or copy code manually</label>
-                <div className="flex gap-2"><input id="compact-signal-code" type="text" readOnly value={signalString} className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-gray-300 truncate" /><button onClick={() => navigator.clipboard.writeText(signalString).then(() => setWarning('Code copied to clipboard.'))} aria-label="Copy code to clipboard" className="min-w-11 min-h-11 bg-white/10 rounded-lg px-3 py-2"><span className="material-symbols-outlined text-sm" aria-hidden="true">content_copy</span></button></div>
-                <p className="text-[10px] text-center text-primary">{signalString.length} characters</p>
-              </div>
-            </div>
-            <p className="mt-6 text-center text-gray-400 text-sm max-w-[260px]">{appState === AppState.SHOWING_OFFER ? 'Waiting for Device B to scan this code…' : 'Share this answer with caller to open the data channel.'}</p>
-            {appState === AppState.SHOWING_OFFER && <button onClick={() => setAppState(AppState.SCANNING_ANSWER)} className="mt-auto w-full py-4 rounded-xl bg-gradient-to-r from-accent to-green-600 text-black font-bold shadow-neon-green flex items-center justify-center gap-2"><span>I Scanned Device B</span><span className="material-symbols-outlined">arrow_forward</span></button>}
-            {appState === AppState.SHOWING_ANSWER && <div className="mt-auto flex flex-col items-center justify-center gap-2 text-primary animate-pulse"><span className="w-2 h-2 bg-primary rounded-full" /><span className="text-xs font-bold uppercase tracking-wider">Waiting for Host to Connect</span></div>}
-          </div>
+          <ShowCodeScreen
+            qrCodeData={qrCodeData}
+            signalString={signalString}
+            isOffer={appState === AppState.SHOWING_OFFER}
+            onCopyCode={() => navigator.clipboard.writeText(signalString).then(() => setWarning('Code copied to clipboard.'))}
+            onContinue={() => setAppState(AppState.SCANNING_ANSWER)}
+          />
         )}
 
         {isScanning && (
-          <div className="fixed inset-0 z-50 bg-black">
-            <QRScanner
-              instruction={appState === AppState.SCANNING_OFFER ? "Scan Host's QR Code" : "Scan Guest's QR Code"}
-              onScan={appState === AppState.SCANNING_OFFER ? handleScanOffer : handleScanAnswer}
-              onClose={endCall}
-            />
-            {DEBUG_MODE && <div className="absolute top-20 left-4 right-4 z-[65] bg-black/90 border border-primary/50 rounded-lg p-4 font-mono text-xs text-primary whitespace-pre-wrap max-h-40 overflow-y-auto">{debugInfo || 'Waiting for QR code scan…'}</div>}
-            <div className="absolute bottom-8 left-6 right-6 z-[60]">
-              <div className="glass-panel p-4 rounded-2xl flex flex-col gap-3 shadow-neon-pink border border-secondary/20 bg-black/80">
-                <label htmlFor="compact-signal-input" className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Or paste compact code</label>
-                <input id="compact-signal-input" type="text" placeholder="v1|o/a|ufrag|pwd|fingerprint|ip:port" value={manualInputVal} onChange={(event) => setManualInputVal(event.target.value)} onPaste={handleManualPaste} disabled={isProcessingManualInput} className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-3 text-sm text-white disabled:opacity-50" />
-                <div className="flex gap-2"><button onClick={handlePasteFromClipboard} disabled={isProcessingManualInput} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-lg disabled:opacity-50"><span className="material-symbols-outlined align-middle">content_paste</span> Paste</button><button onClick={() => handleManualInput()} disabled={isProcessingManualInput || !manualInputVal.trim()} className="flex-1 bg-secondary text-black font-bold py-3 rounded-lg disabled:opacity-50">{isProcessingManualInput ? 'Connecting…' : 'Connect'}</button></div>
-              </div>
-            </div>
-          </div>
+          <ScanScreen
+            instruction={appState === AppState.SCANNING_OFFER ? "Scan Host's QR Code" : 'Scan Guest\'s QR Code'}
+            onScan={appState === AppState.SCANNING_OFFER ? handleScanOffer : handleScanAnswer}
+            onClose={endCall}
+            debugMode={DEBUG_MODE}
+            debugInfo={debugInfo}
+            manualInputValue={manualInputVal}
+            onManualInputChange={setManualInputVal}
+            onManualPaste={handleManualPaste}
+            onPasteFromClipboard={handlePasteFromClipboard}
+            onConnect={() => handleManualInput()}
+            isProcessingManualInput={isProcessingManualInput}
+          />
         )}
       </main>
     </div>
