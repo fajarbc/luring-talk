@@ -10,6 +10,7 @@ import {
   CompactHandshake,
 } from './utils/compact-signaling';
 import { getLocalIP } from './utils/network';
+import { mergeRemoteTrack } from './utils/remote-media';
 
 const ICE_GATHERING_TIMEOUT = 10000;
 const DISCONNECT_GRACE_PERIOD = 5000;
@@ -381,10 +382,7 @@ function App() {
     };
 
     peer.ontrack = (event) => {
-      const stream = event.streams[0] || remoteStreamRef.current || new MediaStream();
-      if (!event.streams[0] && !stream.getTracks().includes(event.track)) {
-        stream.addTrack(event.track);
-      }
+      const stream = mergeRemoteTrack(remoteStreamRef.current, event.streams[0], event.track);
       remoteStreamRef.current = stream;
       setRemoteStream(stream);
       appendDebug(`📹 Remote ${event.track.kind} received with stream`);
