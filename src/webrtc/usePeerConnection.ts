@@ -357,9 +357,6 @@ export function usePeerConnection({
 
   const waitForIceGathering = useCallback((peer: RTCPeerConnection): Promise<boolean> => new Promise((resolve) => {
     let settled = false;
-    let timeoutId: number | undefined;
-    let checkInterval: number | undefined;
-    let cancel: () => void = () => undefined;
 
     const settle = (completed: boolean) => {
       if (settled) return;
@@ -372,22 +369,22 @@ export function usePeerConnection({
       resolve(completed);
     };
 
-    cancel = () => settle(false);
+    const cancel = () => settle(false);
     iceGatheringWaitCleanup.current?.();
     iceGatheringWaitCleanup.current = cancel;
+
+    const timeoutId = window.setTimeout(() => {
+      setWarning('Network discovery is taking longer than expected…');
+      settle(true);
+    }, ICE_GATHERING_TIMEOUT);
+    const checkInterval = window.setInterval(() => {
+      if (peer.iceGatheringState === 'complete') settle(true);
+    }, 100);
 
     if (peer.iceGatheringState === 'complete') {
       settle(true);
       return;
     }
-
-    timeoutId = window.setTimeout(() => {
-      setWarning('Network discovery is taking longer than expected…');
-      settle(true);
-    }, ICE_GATHERING_TIMEOUT);
-    checkInterval = window.setInterval(() => {
-      if (peer.iceGatheringState === 'complete') settle(true);
-    }, 100);
   }), [setWarning]);
 
   const endPeerConnection = useCallback(() => {
