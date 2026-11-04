@@ -14,6 +14,11 @@ import {
 } from './utils/compact-signaling';
 import { getLocalIP } from './utils/network';
 import { mergeRemoteTrack } from './utils/remote-media';
+import {
+  parseDataChannelMessage,
+  serializeDataChannelMessage,
+  type DataChannelMessage,
+} from './src/signaling/data-channel-message';
 
 const ICE_GATHERING_TIMEOUT = 10000;
 const DISCONNECT_GRACE_PERIOD = 5000;
@@ -22,10 +27,6 @@ const MAX_ICE_RESTART_ATTEMPTS = 1;
 const DEBUG_MODE = import.meta.env.VITE_DEBUG_MODE === 'true';
 
 type ConnectionRole = 'offerer' | 'answerer';
-
-type DataChannelMessage =
-  | { type: 'description'; description: RTCSessionDescriptionInit }
-  | { type: 'candidate'; candidate: RTCIceCandidateInit };
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -233,7 +234,7 @@ function App() {
   const sendDataChannelMessage = useCallback((message: DataChannelMessage): boolean => {
     const channel = dataChannel.current;
     if (!channel || channel.readyState !== 'open') return false;
-    channel.send(JSON.stringify(message));
+    channel.send(serializeDataChannelMessage(message));
     return true;
   }, []);
 
@@ -255,10 +256,8 @@ function App() {
     polite: boolean,
     event: MessageEvent,
   ) => {
-    let message: DataChannelMessage;
-    try {
-      message = JSON.parse(String(event.data)) as DataChannelMessage;
-    } catch {
+    const message = parseDataChannelMessage(event.data);
+    if (!message) {
       appendDebug('⚠️ Ignored malformed signaling message');
       return;
     }
@@ -275,7 +274,6 @@ function App() {
     }
 
     const description = message.description;
-    if (!description?.type || !description.sdp) return;
 
     try {
       const readyForOffer = !makingOffer.current && (
