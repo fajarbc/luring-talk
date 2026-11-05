@@ -7,11 +7,15 @@ import HomeScreen from './src/screens/HomeScreen';
 import ShowCodeScreen from './src/screens/ShowCodeScreen';
 import ScanScreen from './src/screens/ScanScreen';
 import {
-  buildDataChannelSdp,
   compactHandshakeFromSdp,
   decodeCompactHandshake,
-  CompactHandshake,
+  type CompactHandshake,
 } from './utils/compact-signaling';
+import {
+  applyInitialAnswer,
+  createInitialAnswer,
+  createInitialOffer,
+} from './src/signaling/initial-call';
 import { getLocalIP } from './utils/network';
 import { usePeerConnection } from './src/webrtc/usePeerConnection';
 
@@ -21,11 +25,6 @@ interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
-
-const normalizeDescription = (handshake: CompactHandshake): RTCSessionDescriptionInit => ({
-  type: handshake.role === 'offer' ? 'offer' : 'answer',
-  sdp: buildDataChannelSdp(handshake, { sessionId: String(Date.now()) }),
-});
 
 function App() {
   const [appState, setAppState] = useState<AppState>(AppState.HOME);
@@ -145,14 +144,12 @@ function App() {
     setAppState(AppState.GENERATING_OFFER);
 
     try {
-      const peer = await initializePeerConnection('offerer');
-      createOfferDataChannel(peer);
-      const offer = await peer.createOffer();
-      await peer.setLocalDescription(offer);
-      if (!await waitForIceGathering(peer)) return;
-      const sdp = peer.localDescription?.sdp;
-      if (!sdp) throw new Error('Peer did not produce an offer SDP.');
-      const compactOffer = compactHandshakeFromSdp('offer', sdp);
+      const compactOffer = await createInitialOffer({
+        initializePeerConnection,
+        createOfferDataChannel,
+        waitForIceGathering,
+      });
+      if (!compactOffer) return;
       await generateQR(compactOffer);
       setAppState(AppState.SHOWING_OFFER);
     } catch (startError) {
@@ -173,14 +170,11 @@ function App() {
     setAppState(AppState.GENERATING_ANSWER);
 
     try {
-      const peer = await initializePeerConnection('answerer');
-      await peer.setRemoteDescription(normalizeDescription(handshake));
-      const answer = await peer.createAnswer();
-      await peer.setLocalDescription(answer);
-      if (!await waitForIceGathering(peer)) return;
-      const sdp = peer.localDescription?.sdp;
-      if (!sdp) throw new Error('Peer did not produce an answer SDP.');
-      const compactAnswer = compactHandshakeFromSdp('answer', sdp);
+      const compactAnswer = await createInitialAnswer(handshake, {
+        initializePeerConnection,
+        waitForIceGathering,
+      });
+      if (!compactAnswer) return;
       await generateQR(compactAnswer);
       setAppState(AppState.SHOWING_ANSWER);
     } catch (offerError) {
@@ -209,7 +203,7 @@ function App() {
     setDebugInfo('⏳ Setting remote data-channel answer…');
 
     try {
-      await peer.setRemoteDescription(normalizeDescription(handshake));
+      await applyInitialAnswer(peer, handshake);
       appendDebug('✅ Remote data-channel answer set; waiting for channel open');
     } catch (answerError) {
       console.error('Error setting final answer:', answerError);
