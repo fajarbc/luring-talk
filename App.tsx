@@ -7,7 +7,6 @@ import HomeScreen from './src/screens/HomeScreen';
 import ShowCodeScreen from './src/screens/ShowCodeScreen';
 import ScanScreen from './src/screens/ScanScreen';
 import {
-  compactHandshakeFromSdp,
   decodeCompactHandshake,
   type CompactHandshake,
 } from './utils/compact-signaling';
