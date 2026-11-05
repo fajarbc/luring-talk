@@ -6,14 +6,12 @@ import {
   serializeDataChannelMessage,
   type DataChannelMessage,
 } from '../signaling/data-channel-message';
+import { captureLocalMedia, switchLocalCamera, type FacingMode } from './local-media';
+import { useConnectionRecovery } from './connection-recovery';
 
 const ICE_GATHERING_TIMEOUT = 10000;
-const DISCONNECT_GRACE_PERIOD = 5000;
-const RECOVERY_TIMEOUT = 20000;
-const MAX_ICE_RESTART_ATTEMPTS = 1;
 
 type ConnectionRole = 'offerer' | 'answerer';
-type FacingMode = 'user' | 'environment';
 
 interface PeerConnectionOptions {
   appendDebug: (message: string) => void;
@@ -29,7 +27,6 @@ export function usePeerConnection({
   setWarning,
 }: PeerConnectionOptions) {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [isReconnecting, setIsReconnecting] = useState(false);
 
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
@@ -41,117 +38,14 @@ export function usePeerConnection({
   const makingOffer = useRef(false);
   const ignoreOffer = useRef(false);
   const isSettingRemoteAnswerPending = useRef(false);
-  const disconnectTimer = useRef<number | null>(null);
-  const recoveryTimeout = useRef<number | null>(null);
-  const recoveryStartedAt = useRef<number | null>(null);
-  const iceRestartAttempts = useRef(0);
   const userEndedCall = useRef(false);
   const iceGatheringWaitCleanup = useRef<(() => void) | null>(null);
-
-  const clearRecoveryTimers = useCallback((): boolean => {
-    const wasRecovering = recoveryStartedAt.current !== null;
-    if (disconnectTimer.current !== null) {
-      window.clearTimeout(disconnectTimer.current);
-      disconnectTimer.current = null;
-    }
-    if (recoveryTimeout.current !== null) {
-      window.clearTimeout(recoveryTimeout.current);
-      recoveryTimeout.current = null;
-    }
-    recoveryStartedAt.current = null;
-    iceRestartAttempts.current = 0;
-    setIsReconnecting(false);
-    return wasRecovering;
-  }, []);
-
-  const requestIceRestart = useCallback((peer: RTCPeerConnection) => {
-    if (
-      userEndedCall.current ||
-      peerRef.current !== peer ||
-      iceRestartAttempts.current >= MAX_ICE_RESTART_ATTEMPTS
-    ) {
-      return;
-    }
-
-    iceRestartAttempts.current += 1;
-    appendDebug(`🔁 Restarting ICE (attempt ${iceRestartAttempts.current}/${MAX_ICE_RESTART_ATTEMPTS})`);
-    try {
-      peer.restartIce();
-    } catch (restartError) {
-      console.error('ICE restart failed:', restartError);
-      clearRecoveryTimers();
-      setError(`Connection recovery failed: ${(restartError as Error).message}`);
-    }
-  }, [appendDebug, clearRecoveryTimers, setError]);
-
-  const armConnectionRecovery = useCallback((peer: RTCPeerConnection, restartImmediately = false) => {
-    if (userEndedCall.current || peerRef.current !== peer) return;
-
-    if (recoveryStartedAt.current === null) {
-      recoveryStartedAt.current = Date.now();
-      appendDebug('⚠️ Connection interrupted; allowing a short recovery window');
-    }
-    setIsReconnecting(true);
-
-    if (recoveryTimeout.current === null) {
-      recoveryTimeout.current = window.setTimeout(() => {
-        recoveryTimeout.current = null;
-        if (userEndedCall.current || peerRef.current !== peer || peer.connectionState === 'connected') return;
-        clearRecoveryTimers();
-        setError('Connection failed after 20 seconds of recovery attempts. Please retry the call.');
-      }, RECOVERY_TIMEOUT);
-    }
-
-    if (restartImmediately) {
-      if (disconnectTimer.current !== null) {
-        window.clearTimeout(disconnectTimer.current);
-        disconnectTimer.current = null;
-      }
-      requestIceRestart(peer);
-      return;
-    }
-
-    if (disconnectTimer.current !== null || iceRestartAttempts.current >= MAX_ICE_RESTART_ATTEMPTS) return;
-    disconnectTimer.current = window.setTimeout(() => {
-      disconnectTimer.current = null;
-      if (userEndedCall.current || peerRef.current !== peer || peer.connectionState === 'connected') return;
-      requestIceRestart(peer);
-    }, DISCONNECT_GRACE_PERIOD);
-  }, [appendDebug, clearRecoveryTimers, requestIceRestart, setError]);
-
-  const captureLocalMedia = useCallback(async (): Promise<MediaStream | null> => {
-    const audio = {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    };
-
-    try {
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            frameRate: { ideal: 30 },
-            facingMode: 'user',
-          },
-          audio,
-        });
-      } catch (videoError) {
-        console.warn('Video initialization failed, falling back to audio-only.', videoError);
-        setWarning('Video device failed. Switching to audio-only mode.');
-        stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
-      }
-
-      localStreamRef.current = stream;
-      return stream;
-    } catch (mediaError) {
-      console.error('Error getting media:', mediaError);
-      setError('Could not access microphone or camera. Please check permissions.');
-      return null;
-    }
-  }, [setError, setWarning]);
+  const {
+    isReconnecting,
+    clearRecoveryTimers,
+    armConnectionRecovery,
+    iceRestartAttempts,
+  } = useConnectionRecovery({ peerRef, userEndedCall, appendDebug, setError });
 
   const sendDataChannelMessage = useCallback((message: DataChannelMessage): boolean => {
     const channel = dataChannelRef.current;
@@ -228,16 +122,17 @@ export function usePeerConnection({
     if (!peer || mediaStarted.current) return;
 
     mediaStarted.current = true;
-    const stream = await captureLocalMedia();
+    const stream = await captureLocalMedia(setError, setWarning);
     if (!stream) {
       mediaStarted.current = false;
       return;
     }
 
+    localStreamRef.current = stream;
     stream.getTracks().forEach((track) => peer.addTrack(track, stream));
     appendDebug('🎥 Local media added; renegotiation will use the data channel');
     setAppState(AppState.CONNECTED);
-  }, [appendDebug, captureLocalMedia, setAppState]);
+  }, [appendDebug, setAppState, setError, setWarning]);
 
   const setupDataChannel = useCallback((
     peer: RTCPeerConnection,
@@ -326,7 +221,7 @@ export function usePeerConnection({
         return;
       }
       if (connectionState === 'failed') {
-        if (iceRestartAttempts.current < MAX_ICE_RESTART_ATTEMPTS) {
+        if (iceRestartAttempts.current < 1) {
           armConnectionRecovery(peer, true);
           return;
         }
@@ -347,7 +242,7 @@ export function usePeerConnection({
 
     peerRef.current = peer;
     return peer;
-  }, [appendDebug, armConnectionRecovery, clearRecoveryTimers, sendDataChannelMessage, sendLocalDescription, setError, setWarning, setupDataChannel, setAppState]);
+  }, [appendDebug, armConnectionRecovery, clearRecoveryTimers, iceRestartAttempts, sendDataChannelMessage, sendLocalDescription, setError, setWarning, setupDataChannel, setAppState]);
 
   const createOfferDataChannel = useCallback((peer: RTCPeerConnection) => {
     const channel = peer.createDataChannel('luring-signaling');
@@ -408,40 +303,9 @@ export function usePeerConnection({
     setRemoteStream(null);
   }, [clearRecoveryTimers]);
 
-  const switchCamera = useCallback(async (facingMode: FacingMode): Promise<FacingMode | null> => {
-    const stream = localStreamRef.current;
-    if (!stream) return null;
-    const currentVideo = stream.getVideoTracks()[0];
-    if (!currentVideo) {
-      setWarning('Cannot switch camera in audio-only mode.');
-      return null;
-    }
-
-    const nextMode: FacingMode = facingMode === 'user' ? 'environment' : 'user';
-    try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: nextMode,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 },
-        },
-      });
-      const newTrack = newStream.getVideoTracks()[0];
-      if (!newTrack) throw new Error('No camera track was returned.');
-      newTrack.enabled = currentVideo.enabled;
-      const sender = peerRef.current?.getSenders().find((candidate) => candidate.track?.kind === 'video');
-      await sender?.replaceTrack(newTrack);
-      currentVideo.stop();
-      stream.removeTrack(currentVideo);
-      stream.addTrack(newTrack);
-      return nextMode;
-    } catch (switchError) {
-      console.error('Failed to switch camera:', switchError);
-      setWarning('Unable to switch camera.');
-      return null;
-    }
-  }, [setWarning]);
+  const switchCamera = useCallback((facingMode: FacingMode): Promise<FacingMode | null> => (
+    switchLocalCamera(localStreamRef.current, peerRef.current, facingMode, setWarning)
+  ), [setWarning]);
 
   return {
     peerRef,
