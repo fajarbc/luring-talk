@@ -123,7 +123,7 @@ function App() {
     }
   };
 
-  const endCall = () => {
+  const endCall = (options?: { preserveError?: boolean }) => {
     endPeerConnection();
     negotiationInFlight.current = false;
     setIsProcessingManualInput(false);
@@ -132,7 +132,7 @@ function App() {
     setManualInputVal('');
     setFacingMode('user');
     setDebugInfo('');
-    setError(null);
+    if (!options?.preserveError) setError(null);
     setWarning(null);
     setAppState(AppState.HOME);
   };
@@ -179,7 +179,7 @@ function App() {
     } catch (offerError) {
       console.error('Error establishing answer:', offerError);
       setError(`Connection failed during data-channel setup: ${(offerError as Error).message}`);
-      endCall();
+      endCall({ preserveError: true });
     } finally {
       negotiationInFlight.current = false;
       setIsProcessingManualInput(false);
