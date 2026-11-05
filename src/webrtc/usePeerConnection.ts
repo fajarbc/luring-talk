@@ -34,7 +34,6 @@ export function usePeerConnection({
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const mediaStarted = useRef(false);
   const dataChannelReady = useRef(false);
-  const initialHandshakeComplete = useRef(false);
   const makingOffer = useRef(false);
   const ignoreOffer = useRef(false);
   const isSettingRemoteAnswerPending = useRef(false);
@@ -144,7 +143,6 @@ export function usePeerConnection({
     channel.binaryType = 'arraybuffer';
     channel.onopen = () => {
       dataChannelReady.current = true;
-      initialHandshakeComplete.current = true;
       appendDebug('🔌 Signaling data channel open');
       setWarning('Secure signaling channel connected. Starting media…');
       void startMediaAndRenegotiate();
@@ -181,7 +179,7 @@ export function usePeerConnection({
     };
 
     peer.onnegotiationneeded = async () => {
-      if (!initialHandshakeComplete.current || !dataChannelReady.current) return;
+      if (!dataChannelReady.current) return;
       try {
         makingOffer.current = true;
         await peer.setLocalDescription();
@@ -296,7 +294,6 @@ export function usePeerConnection({
     remoteStreamRef.current = null;
     mediaStarted.current = false;
     dataChannelReady.current = false;
-    initialHandshakeComplete.current = false;
     makingOffer.current = false;
     ignoreOffer.current = false;
     isSettingRemoteAnswerPending.current = false;
