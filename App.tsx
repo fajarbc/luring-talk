@@ -39,7 +39,6 @@ function App() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [isProcessingManualInput, setIsProcessingManualInput] = useState(false);
 
-  const bgVideoRef = useRef<HTMLVideoElement>(null);
   const negotiationInFlight = useRef(false);
 
   const appendDebug = useCallback((message: string) => {
@@ -57,12 +56,6 @@ function App() {
     endPeerConnection,
     switchCamera,
   } = usePeerConnection({ appendDebug, setAppState, setError, setWarning });
-
-  useEffect(() => {
-    if (localStreamRef.current && bgVideoRef.current) {
-      bgVideoRef.current.srcObject = localStreamRef.current;
-    }
-  }, [appState, facingMode, localStreamRef]);
 
   useEffect(() => {
     let cancelled = false;
@@ -331,13 +324,6 @@ function App() {
       {warning && (
         <div role="status" aria-live="polite" className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] max-w-[calc(100%-3rem)] bg-yellow-500/90 text-black px-6 py-3 rounded-full font-bold shadow-lg text-sm text-center">
           {warning}
-        </div>
-      )}
-
-      {isSetup && localStreamRef.current && (
-        <div className="absolute inset-0 z-0 opacity-20 pointer-events-none overflow-hidden">
-          <video ref={bgVideoRef} autoPlay muted playsInline className="w-full h-full object-cover blur-md scale-110" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
         </div>
       )}
 
