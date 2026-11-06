@@ -11,6 +11,8 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localVideoWrapperRef = useRef<HTMLDivElement>(null);
+  const activeFacingMode = localStream.getVideoTracks()[0]?.getSettings().facingMode;
+  const shouldMirrorLocalPreview = activeFacingMode !== 'environment';
   
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
@@ -215,7 +217,7 @@ const VideoCall: React.FC<VideoCallProps> = ({ localStream, remoteStream, onEndC
             playsInline 
             muted 
             onError={handleLocalVideoError}
-            className="w-full h-full object-cover transform -scale-x-100" 
+            className={`w-full h-full object-cover ${shouldMirrorLocalPreview ? 'transform -scale-x-100' : ''}`}
           />
           {isVideoMuted && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 backdrop-blur-sm">
